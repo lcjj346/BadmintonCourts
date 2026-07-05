@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Build artifacts
+*.tsbuildinfo
+dist/
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Brainstorming companion sessions
+.superpowers/
+
+# Misc
+.DS_Store
+*.log
