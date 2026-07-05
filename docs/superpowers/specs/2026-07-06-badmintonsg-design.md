@@ -249,8 +249,8 @@ Manage mutations use PATCH/DELETE (not GET links) so tokens aren't triggered by 
 | Env/secret hygiene | Zod-validated `env.ts` fails the build on missing/malformed vars; secrets only in Vercel env, never committed. |
 
 Rate limiting is implemented in **Postgres** (`RateLimitEvent` count-within-window per
-ipHash/action/target) — correct across serverless instances, no Redis/extra infra. A
-periodic delete of events older than 24h keeps the table tiny.
+ipHash/action/target) — correct across serverless instances, no Redis/extra infra. The
+on-read sweep (§7) also deletes events older than 24h, keeping the table tiny.
 
 ## 9. Infrastructure & Operations
 
