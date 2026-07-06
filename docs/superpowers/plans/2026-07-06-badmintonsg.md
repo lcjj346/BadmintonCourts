@@ -661,7 +661,7 @@ const postBase = z.object({
 });
 
 const timeOrder = (v: { startTime: string; endTime: string }) => v.endTime > v.startTime;
-const TIME_ORDER_MSG = { message: "End time must be after start time", path: ["endTime"] as const };
+const TIME_ORDER_MSG = { message: "End time must be after start time", path: ["endTime"] };
 
 export const createListingSchema = postBase
   .extend({ priceCents: z.number().int().min(0).max(50_000).nullable() })

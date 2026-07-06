@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Region {
+  NORTH
+  SOUTH
+  EAST
+  WEST
+  CENTRAL
+}
+
+enum VenueType {
+  SPORTS_HALL
+  COMMUNITY_CENTRE
+  SCHOOL
+  OTHER
+}
+
+enum ListingStatus {
+  AVAILABLE
+  SOLD
+  EXPIRED
+}
+
+enum SessionStatus {
+  OPEN
+  FILLED
+  EXPIRED
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum RateAction {
+  REVEAL
+  CREATE
+  REPORT
+}
+
+model Venue {
+  id               String    @id @default(uuid())
+  name             String    @unique
+  address          String
+  postalCode       String
+  region           Region
+  venueType        VenueType
+  availabilityNote String?   // e.g. "Weekends & school holidays only" for DUS schools
+  listings         Listing[]
+  sessions         GameSession[]
+}
+
+model Listing {
+  id         String        @id @default(uuid())
+  venueId    String
+  venue      Venue         @relation(fields: [venueId], references: [id])
+  date       DateTime      @db.Date      // SGT calendar date — see §5
+  startTime  String                       // "08:00" SGT wall-clock
+  endTime    String                       // "10:00"
+  priceCents Int?                         // 0 = free, null = negotiable
+  notes      String?
+  phone      String?                      // nullable: scrubbed post-expiry (§7). NEVER in public selects
+  status     ListingStatus @default(AVAILABLE)
+  editToken  String        @unique @default(uuid())
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([date, status])
+  @@index([venueId])
+}
+
+model GameSession {
+  id                  String        @id @default(uuid())
+  venueId             String
+  venue               Venue         @relation(fields: [venueId], references: [id])
+  date                DateTime      @db.Date
+  startTime           String
+  endTime             String
+  playersNeeded       Int
+  skillLevel          SkillLevel
+  pricePerPlayerCents Int?                // 0 = free, null = split/negotiable
+  notes               String?
+  phone               String?             // same scrubbing + select rules as Listing
+  status              SessionStatus @default(OPEN)
+  editToken           String        @unique @default(uuid())
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([date, status])
+  @@index([venueId])
+}
+
+model RateLimitEvent {
+  id        String     @id @default(uuid())
+  ipHash    String                        // SHA-256(ip + server salt); raw IPs never stored
+  action    RateAction
+  targetId  String?                       // listing/session id for per-target reveal limits
+  createdAt DateTime   @default(now())
+
+  @@index([ipHash, action, createdAt])
+}
+
+model ReportFlag {
+  id         String   @id @default(uuid())
+  targetType String                       // "listing" | "session"
+  targetId   String
+  ipHash     String
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+}
+
+model VenueSuggestion {
+  id        String   @id @default(uuid())
+  name      String
+  details   String?
+  createdAt DateTime @default(now())
+}
