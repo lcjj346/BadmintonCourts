@@ -1082,7 +1082,7 @@ export async function sweepExpired(): Promise<void> {
   ]);
 }
 
-const TIME_RANGES = {
+export const TIME_RANGES = {
   MORNING: { lt: "12:00" },
   AFTERNOON: { gte: "12:00", lt: "18:00" },
   EVENING: { gte: "18:00" },
@@ -1280,7 +1280,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todaySgt, strToDate } from "@/lib/time";
 import type { BoardFilters, CreateSessionInput } from "@/lib/schemas";
-import { ActivePostCapError, sweepExpired } from "@/services/listingService";
+import { ActivePostCapError, sweepExpired, TIME_RANGES } from "@/services/listingService";
 
 export const PUBLIC_SESSION_SELECT = {
   id: true, date: true, startTime: true, endTime: true,
@@ -1292,12 +1292,6 @@ export const PUBLIC_SESSION_SELECT = {
 } satisfies Prisma.GameSessionSelect;
 
 export type PublicSession = Prisma.GameSessionGetPayload<{ select: typeof PUBLIC_SESSION_SELECT }>;
-
-const TIME_RANGES = {
-  MORNING: { lt: "12:00" },
-  AFTERNOON: { gte: "12:00", lt: "18:00" },
-  EVENING: { gte: "18:00" },
-} as const;
 
 export async function listSessions(filters: BoardFilters): Promise<PublicSession[]> {
   await sweepExpired();
