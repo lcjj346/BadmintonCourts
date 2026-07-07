@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Both jobs need a throwaway Postgres. Service tests hit a real database, and
+# they wipe/seed rows, so each job gets its own isolated instance.
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/badmintonsg
+  DIRECT_URL: postgresql://postgres:postgres@localhost:5432/badmintonsg
+  IP_HASH_SALT: ci-test-salt
+
+jobs:
+  test:
+    name: Typecheck · unit tests · build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: badmintonsg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+      - name: Seed venues
+        run: npx prisma db seed
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit + integration tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+
+  e2e:
+    name: Playwright E2E (core loop)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: badmintonsg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+      - name: Seed venues
+        run: npx prisma db seed
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E
+        run: npm run test:e2e
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

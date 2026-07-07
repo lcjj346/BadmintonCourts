@@ -1,0 +1,1 @@
+ALTER TYPE "RateAction" ADD VALUE 'REPORT';
