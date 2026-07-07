@@ -43,6 +43,33 @@ number to call". No sign-up friction, no login, used courtside on a phone.
 | Analytics | **Vercel Analytics** | Free, privacy-light traffic measurement |
 | Hosting | **Vercel + Supabase** | Both free tiers cover ~1,000 users/day at $0/mo |
 
+```mermaid
+flowchart LR
+    subgraph app ["🖥️ Application"]
+        NEXT["Next.js 15<br/>App Router"]
+        TS["TypeScript<br/>strict"]
+        TW["Tailwind v4<br/>court-green tokens"]
+    end
+    subgraph data ["🗄️ Data"]
+        PRISMA["Prisma 6"]
+        PG["PostgreSQL<br/>Supabase"]
+        ZOD["Zod<br/>input + env validation"]
+    end
+    subgraph quality ["✅ Quality"]
+        JEST["Jest + RTL<br/>65 tests"]
+        PW["Playwright<br/>core-loop E2E"]
+        TSC["tsc --noEmit<br/>required gate"]
+    end
+    subgraph ops ["🚀 Operations"]
+        VERCEL["Vercel<br/>hosting + Analytics"]
+        PINO["Pino<br/>PII-redacted logs"]
+        DAYJS["dayjs<br/>SGT time, one file"]
+    end
+    app --> data
+    quality -.verifies.-> app
+    ops -.runs & observes.-> app
+```
+
 ---
 
 ## Architecture
@@ -51,28 +78,38 @@ The app is a single Next.js project with a strict internal boundary: **all datab
 lives in `src/services/`; route handlers and pages only validate, call a service, and shape
 the response.** This keeps the data logic testable and phone numbers structurally contained.
 
+```mermaid
+flowchart TD
+    B["📱 Browser — mobile-first, used courtside"]
+
+    subgraph vercel ["Next.js App Router · deployed on Vercel"]
+        SC["Server Components<br/>src/app/**/page.tsx<br/>board · detail · manage · post"]
+        RH["Route Handlers — HTTP API<br/>src/app/api/**/route.ts<br/>returns a data/error envelope"]
+        ZOD["Zod validation<br/>lib/schemas.ts — SG phone, dates,<br/>honeypot · lib/env.ts — env vars"]
+        SVC["Services — the ONLY place Prisma runs<br/>listing · session · manage<br/>rateLimit · venue · report"]
+        PC["Prisma client singleton<br/>src/lib/db.ts"]
+    end
+
+    DB[("PostgreSQL · Supabase<br/>Venue · Listing · GameSession<br/>RateLimitEvent · ReportFlag · VenueSuggestion")]
+
+    B -->|"page navigation"| SC
+    B -->|"fetch() — post, reveal, report"| RH
+    RH --> ZOD --> SVC
+    SC -->|"reads via PUBLIC_SELECT<br/>(phone + editToken omitted)"| SVC
+    SVC --> PC
+    PC -->|"pooled connection (pgbouncer)"| DB
+
+    style SVC fill:#dcfce7,stroke:#14532d,color:#14532d
+    style DB fill:#f0fdf4,stroke:#14532d,color:#14532d
 ```
-Browser (phone)
-   │  fetch() / navigation
-   ▼
-Next.js App Router
-   ├─ Server Components (pages)         src/app/**/page.tsx      ← board, detail, manage, post
-   │     read via services (no phone)
-   └─ Route Handlers (HTTP API)         src/app/api/**/route.ts  ← { data, error } envelope
-         validate with Zod, call a service
-   │
-   ▼
-Services  (the ONLY place Prisma runs)  src/services/*.ts
-   listingService · sessionService · manageService
-   rateLimitService · venueService · reportService
-   │
-   ▼
-Prisma Client (singleton)               src/lib/db.ts
-   │
-   ▼
-PostgreSQL (Supabase)                    Venue · Listing · GameSession
-                                         RateLimitEvent · ReportFlag · VenueSuggestion
-```
+
+Two structural guarantees fall out of this shape:
+
+- **Phone containment** — pages and list APIs can only read through `PUBLIC_*_SELECT`
+  projections that omit `phone`/`editToken`, so a scraper can't find a number anywhere
+  except the rate-limited reveal endpoint.
+- **Testability** — every service is a plain async function against Postgres, tested
+  directly without HTTP.
 
 ### Directory map
 
@@ -117,6 +154,38 @@ e2e/                         Playwright core-loop happy path
 - **VenueSuggestion** — "venue not listed" requests.
 
 ### How data flows (a court transfer, end to end)
+
+```mermaid
+sequenceDiagram
+    actor S as Seller
+    actor B as Buyer
+    participant App as Next.js on Vercel
+    participant DB as Postgres on Supabase
+
+    Note over S,DB: 1 · Post a court slot
+    S->>App: POST /api/listings — venue, date, time, price, phone
+    App->>App: Zod validate · honeypot check · rate limit by hashed IP
+    App->>DB: create Listing
+    DB-->>App: secret editToken
+    App-->>S: redirect to /manage/token?created=1 — "save this link"
+
+    Note over S,DB: 2 · Browse (phone never sent)
+    B->>App: GET / — date strip + region/venue/time filters
+    App->>DB: sweep expired posts, then query via PUBLIC_SELECT
+    DB-->>App: listings WITHOUT phone or editToken
+    App-->>B: board HTML — number not present anywhere
+
+    Note over S,DB: 3 · Reveal (the only phone path)
+    B->>App: POST /api/listings/id/reveal
+    App->>App: rate limit — 3/hr per listing, 30/hr + 100/day per IP
+    App->>DB: read phone for this one listing
+    App-->>B: phone number → tel: and WhatsApp links
+    B->>S: 🏸 deal happens off-platform
+
+    Note over S,DB: 4 · Close
+    S->>App: PATCH /manage/token — mark as sold
+    App->>DB: status = SOLD (stays on board, badged, until date passes)
+```
 
 1. **Post** — seller fills the court form → `POST /api/listings`. Zod validates (SG phone,
    date within today→+8 weeks, honeypot empty). The route rate-limits by hashed IP, then
