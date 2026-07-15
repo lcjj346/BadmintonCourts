@@ -28,14 +28,6 @@ export function DateStrip() {
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto py-2">
-      <button onClick={() => go(null)} className={pillClass(!selected)}>
-        All
-      </button>
-      {days.map((d) => (
-        <button key={d} onClick={() => go(d)} className={pillClass(d === selected)}>
-          {formatDateLabel(d)}
-        </button>
-      ))}
       <label className="relative shrink-0 rounded-full border border-court px-3 py-1 text-sm text-court">
         📅
         <input
@@ -47,6 +39,14 @@ export function DateStrip() {
           onChange={(e) => e.target.value && go(e.target.value)}
         />
       </label>
+      <button onClick={() => go(null)} className={pillClass(!selected)}>
+        All
+      </button>
+      {days.map((d) => (
+        <button key={d} onClick={() => go(d)} className={pillClass(d === selected)}>
+          {formatDateLabel(d)}
+        </button>
+      ))}
     </div>
   );
 }
