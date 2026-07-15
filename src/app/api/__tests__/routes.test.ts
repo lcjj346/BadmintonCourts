@@ -29,7 +29,7 @@ describe("listings API", () => {
     const venue = await makeVenue();
     const body = {
       venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
-      priceCents: 1600, phone: "91234567", website: "",
+      priceCents: 1600, phone: "+6591234567", website: "",
     };
 
     const createRes = await createListingRoute(req("http://x/api/listings", "POST", body));
@@ -40,10 +40,10 @@ describe("listings API", () => {
     const listRes = await listListingsRoute(new Request(`http://x/api/listings?date=${todaySgt()}`));
     const list = await listRes.json();
     expect(list.data).toHaveLength(1);
-    expect(JSON.stringify(list.data)).not.toContain("91234567");
+    expect(JSON.stringify(list.data)).not.toContain("+6591234567");
 
     const revealRes = await revealRoute(req(`http://x/api/listings/${data.id}/reveal`, "POST"), params({ id: data.id }));
-    expect((await revealRes.json()).data.phone).toBe("91234567");
+    expect((await revealRes.json()).data.phone).toBe("+6591234567");
 
     const mg = await manageGet(req(`http://x/api/manage/${data.editToken}`, "GET"), params({ token: data.editToken }));
     expect((await mg.json()).data.type).toBe("listing");
@@ -69,7 +69,7 @@ describe("listings API", () => {
     const venue = await makeVenue();
     const res = await createListingRoute(req("http://x/api/listings", "POST", {
       venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
-      priceCents: 0, phone: "91234567", website: "http://spam.example",
+      priceCents: 0, phone: "+6591234567", website: "http://spam.example",
     }));
     expect(res.status).toBe(201);
     expect(await prisma.listing.count()).toBe(0);
@@ -85,7 +85,7 @@ describe("listings API", () => {
     const venue = await makeVenue();
     const createRes = await createListingRoute(req("http://x/api/listings", "POST", {
       venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
-      priceCents: 1600, phone: "91234567", website: "",
+      priceCents: 1600, phone: "+6591234567", website: "",
     }));
     const { data } = await createRes.json();
 
@@ -108,8 +108,8 @@ describe("sessions API", () => {
     const venue = await makeVenue();
     const body = {
       venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
-      playersNeeded: 2, skillLevel: "INTERMEDIATE", pricePerPlayerCents: 400,
-      phone: "91234567", website: "",
+      playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
+      phone: "+6591234567", website: "",
     };
 
     const createRes = await createSessionRoute(req("http://x/api/sessions", "POST", body));
@@ -119,10 +119,10 @@ describe("sessions API", () => {
 
     const listRes = await listSessionsRoute(new Request(`http://x/api/sessions?date=${todaySgt()}`));
     const listJson = await listRes.json();
-    expect(JSON.stringify(listJson)).not.toContain("91234567");
+    expect(JSON.stringify(listJson)).not.toContain("+6591234567");
 
     const revealRes = await sessionRevealRoute(req(`http://x/api/sessions/${data.id}/reveal`, "POST"), params({ id: data.id }));
-    expect((await revealRes.json()).data.phone).toBe("91234567");
+    expect((await revealRes.json()).data.phone).toBe("+6591234567");
   });
 });
 

@@ -36,7 +36,6 @@ export function timeBucket(startTime: string): TimeBucket {
 export function formatDateLabel(s: string): string {
   const today = todaySgt();
   if (s === today) return "Today";
-  if (s === dayjs(today).add(1, "day").format(FMT)) return "Tmrw";
   return dayjs(s).format("ddd D MMM");
 }
 

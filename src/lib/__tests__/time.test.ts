@@ -1,7 +1,8 @@
 /** @jest-environment node */
+import dayjs from "dayjs";
 import {
   todaySgt, maxPostDateSgt, dateToStr, strToDate,
-  timeBucket, formatPrice,
+  timeBucket, formatPrice, formatDateLabel,
 } from "@/lib/time";
 
 describe("time", () => {
@@ -24,6 +25,14 @@ describe("time", () => {
     expect(timeBucket("12:00")).toBe("AFTERNOON");
     expect(timeBucket("17:59")).toBe("AFTERNOON");
     expect(timeBucket("18:00")).toBe("EVENING");
+  });
+
+  it("labels today as Today and never Tmrw, otherwise ddd D MMM", () => {
+    const today = todaySgt();
+    const tomorrow = dayjs(today).add(1, "day").format("YYYY-MM-DD");
+    expect(formatDateLabel(today)).toBe("Today");
+    expect(formatDateLabel(tomorrow)).not.toBe("Tmrw");
+    expect(formatDateLabel(tomorrow)).toBe(dayjs(tomorrow).format("ddd D MMM"));
   });
 
   it("formats prices", () => {

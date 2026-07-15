@@ -45,8 +45,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </header>
         <main className="mx-auto max-w-md px-4 pb-24 pt-4">{children}</main>
         <footer className="mx-auto max-w-md px-4 pb-6 text-center text-xs text-gray-400">
-          We store only your post details and phone number, and delete numbers 7 days after a
-          post expires. IPs are stored hashed, for rate limiting only.
+          <p>
+            <Link href="/faq" className="font-medium text-court underline">FAQ &amp; skill guide</Link>
+          </p>
+          <p className="mt-2">
+            We store only your post details and phone number, and delete numbers 7 days after a
+            post expires. IPs are stored hashed, for rate limiting only.
+          </p>
         </footer>
         <Analytics />
       </body>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/BottomSheet";
 import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
 import { todaySgt, maxPostDateSgt, TIME_OPTIONS } from "@/lib/time";
+import { SKILL_OPTIONS } from "@/lib/skill";
 
 export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: VenueOption[] }) {
   const router = useRouter();
@@ -16,8 +17,9 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
   const [price, setPrice] = useState(""); // dollars string; "" → negotiable
   const [free, setFree] = useState(false);
   const [playersNeeded, setPlayersNeeded] = useState(2);
-  const [skillLevel, setSkillLevel] = useState("INTERMEDIATE");
+  const [skillLevel, setSkillLevel] = useState("MID_INTERMEDIATE");
   const [notes, setNotes] = useState("");
+  const [countryCode, setCountryCode] = useState("+65");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -32,12 +34,15 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
     setSubmitting(true);
 
     const cents = free ? 0 : price === "" ? null : Math.round(parseFloat(price) * 100);
+    let local = phone.replace(/\D/g, "");
+    if (countryCode === "+60") local = local.replace(/^0/, "");
+    const e164 = `${countryCode}${local}`;
     const body =
       kind === "court"
-        ? { venueId, date, startTime, endTime, priceCents: cents, notes: notes || undefined, phone, website: "" }
+        ? { venueId, date, startTime, endTime, priceCents: cents, notes: notes || undefined, phone: e164, website: "" }
         : {
             venueId, date, startTime, endTime, playersNeeded, skillLevel,
-            pricePerPlayerCents: cents, notes: notes || undefined, phone, website: "",
+            pricePerPlayerCents: cents, notes: notes || undefined, phone: e164, website: "",
           };
 
     try {
@@ -116,7 +121,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
         <>
           <label className={label}>Players needed</label>
           <select className={input} value={playersNeeded} onChange={(e) => setPlayersNeeded(Number(e.target.value))}>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
+            {Array.from({ length: 50 }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
@@ -127,9 +132,9 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
             value={skillLevel}
             onChange={(e) => setSkillLevel(e.target.value)}
           >
-            <option value="BEGINNER">Beginner</option>
-            <option value="INTERMEDIATE">Intermediate</option>
-            <option value="ADVANCED">Advanced</option>
+            {SKILL_OPTIONS.map(([value, text]) => (
+              <option key={value} value={value}>{text}</option>
+            ))}
           </select>
         </>
       )}
@@ -162,15 +167,26 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       />
 
       <label className={label}>Your mobile number</label>
-      <input
-        className={input}
-        type="tel"
-        inputMode="numeric"
-        placeholder="9123 4567"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value.replace(/\s/g, ""))}
-        required
-      />
+      <div className="flex gap-3">
+        <select
+          className={`${input} w-20 shrink-0`}
+          aria-label="Country code"
+          value={countryCode}
+          onChange={(e) => setCountryCode(e.target.value)}
+        >
+          <option value="+65">+65</option>
+          <option value="+60">+60</option>
+        </select>
+        <input
+          className={input}
+          type="tel"
+          inputMode="numeric"
+          placeholder="9123 4567"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value.replace(/\s/g, ""))}
+          required
+        />
+      </div>
       <p className="mt-1 text-xs text-gray-400">
         Shown only to people who tap &quot;Reveal contact&quot;. Deleted 7 days after your post expires.
       </p>

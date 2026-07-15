@@ -2,8 +2,7 @@ import Link from "next/link";
 import type { PublicSession } from "@/services/sessionService";
 import { formatPrice } from "@/lib/time";
 import { StatusBadge } from "@/components/StatusBadge";
-
-const SKILL_LABEL = { BEGINNER: "Beginner", INTERMEDIATE: "Intermediate", ADVANCED: "Advanced" } as const;
+import { SKILL_LABELS } from "@/lib/skill";
 
 export function SessionCard({ session }: { session: PublicSession }) {
   const filled = session.status !== "OPEN";
@@ -35,7 +34,7 @@ export function SessionCard({ session }: { session: PublicSession }) {
           <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-court-light/70 px-2 py-0.5 text-[11px] font-semibold text-court">
             <span className="tabular-nums">Needs {session.playersNeeded}</span>
             <span className="text-court/40">·</span>
-            <span>{SKILL_LABEL[session.skillLevel]}</span>
+            <span>{SKILL_LABELS[session.skillLevel]}</span>
           </div>
           {session.venue.availabilityNote && (
             <div className="mt-1.5 flex items-start gap-1 text-xs text-amber-700">

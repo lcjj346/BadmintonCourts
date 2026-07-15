@@ -7,7 +7,7 @@ const base = {
   date: todaySgt(),
   startTime: "08:00",
   endTime: "10:00",
-  phone: "91234567",
+  phone: "+6591234567",
   website: "",
 };
 
@@ -22,8 +22,14 @@ describe("createListingSchema", () => {
     expect(createListingSchema.safeParse({ ...base, priceCents: null }).success).toBe(true);
   });
 
-  it("rejects non-SG phones", () => {
-    for (const phone of ["1234567", "612345678", "9123456", "+6591234567"]) {
+  it("accepts SG and MY phones", () => {
+    for (const phone of ["+6591234567", "+6581234567", "+60123456789", "+601234567890"]) {
+      expect(createListingSchema.safeParse({ ...base, phone, priceCents: 0 }).success).toBe(true);
+    }
+  });
+
+  it("rejects invalid phones", () => {
+    for (const phone of ["1234567", "612345678", "9123456", "91234567", "+65712345", "+6071234567"]) {
       expect(createListingSchema.safeParse({ ...base, phone, priceCents: 0 }).success).toBe(false);
     }
   });
@@ -49,17 +55,40 @@ describe("createListingSchema", () => {
 describe("createSessionSchema", () => {
   it("accepts a valid session", () => {
     const r = createSessionSchema.safeParse({
-      ...base, playersNeeded: 2, skillLevel: "INTERMEDIATE", pricePerPlayerCents: 400,
+      ...base, playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
     });
     expect(r.success).toBe(true);
   });
 
   it("rejects playersNeeded out of range", () => {
-    for (const playersNeeded of [0, 21]) {
+    for (const playersNeeded of [0, 51]) {
       expect(createSessionSchema.safeParse({
-        ...base, playersNeeded, skillLevel: "BEGINNER", pricePerPlayerCents: null,
+        ...base, playersNeeded, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null,
       }).success).toBe(false);
     }
+  });
+
+  it("accepts playersNeeded up to 50", () => {
+    expect(createSessionSchema.safeParse({
+      ...base, playersNeeded: 50, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null,
+    }).success).toBe(true);
+  });
+
+  it("accepts all seven skill levels", () => {
+    for (const skillLevel of [
+      "LOW_BEGINNER", "MID_BEGINNER", "HIGH_BEGINNER", "LOW_INTERMEDIATE",
+      "MID_INTERMEDIATE", "HIGH_INTERMEDIATE", "ADVANCED",
+    ]) {
+      expect(createSessionSchema.safeParse({
+        ...base, playersNeeded: 2, skillLevel, pricePerPlayerCents: null,
+      }).success).toBe(true);
+    }
+  });
+
+  it("rejects an old three-value skill level", () => {
+    expect(createSessionSchema.safeParse({
+      ...base, playersNeeded: 2, skillLevel: "INTERMEDIATE", pricePerPlayerCents: null,
+    }).success).toBe(false);
   });
 });
 
@@ -69,11 +98,29 @@ describe("boardFilterSchema", () => {
   });
 
   it("drops invalid values rather than crashing the board, keeping valid siblings", () => {
-    const r = boardFilterSchema.safeParse({ region: "MOON", time: "EVENING" });
+    const r = boardFilterSchema.safeParse({ region: "MOON", timeFrom: "08:00" });
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.region).toBeUndefined();
-      expect(r.data.time).toBe("EVENING");
+      expect(r.data.timeFrom).toBe("08:00");
     }
+  });
+
+  it("accepts timeFrom/timeTo range and drops malformed times", () => {
+    const r = boardFilterSchema.safeParse({ timeFrom: "08:00", timeTo: "18:00" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.timeFrom).toBe("08:00");
+      expect(r.data.timeTo).toBe("18:00");
+    }
+    const bad = boardFilterSchema.safeParse({ timeFrom: "25:99" });
+    expect(bad.success).toBe(true);
+    if (bad.success) expect(bad.data.timeFrom).toBeUndefined();
+  });
+
+  it("accepts the available flag", () => {
+    const r = boardFilterSchema.safeParse({ available: "1" });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.available).toBe("1");
   });
 });
