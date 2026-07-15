@@ -25,7 +25,7 @@ export default async function ManagePage({
   const closed = post.status === "SOLD" || post.status === "FILLED";
 
   return (
-    <main className="pt-6">
+    <main className="mx-auto w-full max-w-lg pt-6">
       {created && (
         <div className="rounded-2xl bg-court-light p-4">
           <h1 className="font-bold text-court">🎉 Posted!</h1>

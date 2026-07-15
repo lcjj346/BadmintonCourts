@@ -13,8 +13,9 @@ describe("DateStrip", () => {
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText("Today")).toBeInTheDocument();
     expect(screen.queryByText("Tmrw")).not.toBeInTheDocument();
-    // All + Today + next 13 days = 15 buttons.
-    expect(screen.getAllByRole("button")).toHaveLength(15);
+    // Pick (calendar) + All + Today + next 13 days = 16 buttons.
+    expect(screen.getAllByRole("button")).toHaveLength(16);
+    expect(screen.getByText("Pick")).toBeInTheDocument();
     expect(screen.getByLabelText("Jump to date")).toBeInTheDocument();
   });
 

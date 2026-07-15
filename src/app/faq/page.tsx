@@ -27,7 +27,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 export default function FaqPage() {
   return (
-    <main className="pt-4">
+    <main className="mx-auto w-full max-w-2xl pt-4">
       <Link href="/" className="text-sm text-gray-400">← Back to board</Link>
       <h1 className="mt-3 text-2xl font-bold text-court">Frequently asked questions</h1>
 

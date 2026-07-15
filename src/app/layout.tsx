@@ -36,15 +36,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className="min-h-screen bg-paper text-gray-900 antialiased">
         <header className="sticky top-0 z-40 border-b border-court/10 bg-paper/85 backdrop-blur-md">
-          <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
+          <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3 md:max-w-3xl lg:max-w-5xl">
             <Wordmark />
             <span className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
               Singapore
             </span>
           </div>
         </header>
-        <main className="mx-auto max-w-md px-4 pb-24 pt-4">{children}</main>
-        <footer className="mx-auto max-w-md px-4 pb-6 text-center text-xs text-gray-400">
+        <main className="mx-auto max-w-md px-4 pb-24 pt-4 md:max-w-3xl lg:max-w-5xl">{children}</main>
+        <footer className="mx-auto max-w-md px-4 pb-6 text-center text-xs text-gray-400 md:max-w-3xl lg:max-w-5xl">
           <p>
             We store only your post details and phone number, and delete numbers 7 days after a
             post expires. IPs are stored hashed, for rate limiting only.

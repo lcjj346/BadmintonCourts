@@ -88,12 +88,16 @@ export default async function BoardPage({
               <h2 className="sticky top-14 z-10 bg-paper/85 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 backdrop-blur">
                 {g.label}
               </h2>
-              <div className="space-y-2">{g.rows.map(renderCard)}</div>
+              <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
+                {g.rows.map(renderCard)}
+              </div>
             </section>
           ))}
         </div>
       ) : (
-        <div className="mt-2 space-y-2">{list.map(renderCard)}</div>
+        <div className="mt-2 space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
+          {list.map(renderCard)}
+        </div>
       )}
 
       <Link

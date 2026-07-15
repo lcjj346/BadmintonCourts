@@ -6,7 +6,7 @@ const TYPES = ["SPORTS_HALL", "COMMUNITY_CENTRE", "SCHOOL", "OTHER"];
 
 describe("venues.json", () => {
   it("has a meaningful set of venues", () => {
-    expect(venues.length).toBeGreaterThanOrEqual(40);
+    expect(venues.length).toBeGreaterThanOrEqual(448);
   });
 
   it("every venue is well-formed", () => {

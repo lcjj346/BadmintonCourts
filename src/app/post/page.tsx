@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function PostChooser() {
   return (
-    <main className="pt-10">
+    <main className="mx-auto w-full max-w-lg pt-10">
       <Link href="/" className="text-sm text-gray-400">← Back</Link>
       <h1 className="mt-4 text-xl font-bold">What are you posting?</h1>
       <div className="mt-6 space-y-3">

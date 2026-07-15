@@ -2,7 +2,7 @@
 import dayjs from "dayjs";
 import {
   todaySgt, maxPostDateSgt, dateToStr, strToDate,
-  timeBucket, formatPrice, formatDateLabel,
+  formatPrice, formatDateLabel, TIME_OPTIONS, addHoursToTime,
 } from "@/lib/time";
 
 describe("time", () => {
@@ -19,14 +19,6 @@ describe("time", () => {
     expect(dateToStr(strToDate("2026-07-11"))).toBe("2026-07-11");
   });
 
-  it("buckets times", () => {
-    expect(timeBucket("08:00")).toBe("MORNING");
-    expect(timeBucket("11:59")).toBe("MORNING");
-    expect(timeBucket("12:00")).toBe("AFTERNOON");
-    expect(timeBucket("17:59")).toBe("AFTERNOON");
-    expect(timeBucket("18:00")).toBe("EVENING");
-  });
-
   it("labels today as Today and never Tmrw, otherwise ddd D MMM", () => {
     const today = todaySgt();
     const tomorrow = dayjs(today).add(1, "day").format("YYYY-MM-DD");
@@ -40,5 +32,19 @@ describe("time", () => {
     expect(formatPrice(null)).toBe("Negotiable");
     expect(formatPrice(1600)).toBe("$16");
     expect(formatPrice(1650)).toBe("$16.50");
+  });
+
+  it("TIME_OPTIONS is half-hourly 07:00–23:30", () => {
+    expect(TIME_OPTIONS).toHaveLength(34);
+    expect(TIME_OPTIONS[0]).toBe("07:00");
+    expect(TIME_OPTIONS[1]).toBe("07:30");
+    expect(TIME_OPTIONS[TIME_OPTIONS.length - 1]).toBe("23:30");
+  });
+
+  it("addHoursToTime handles half-hours, long durations, and the midnight cap", () => {
+    expect(addHoursToTime("12:30", 2)).toBe("14:30");
+    expect(addHoursToTime("08:00", 1.5)).toBe("09:30");
+    expect(addHoursToTime("09:00", 10)).toBe("19:00");
+    expect(addHoursToTime("21:30", 10)).toBe("23:59"); // capped
   });
 });

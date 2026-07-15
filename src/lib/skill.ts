@@ -11,3 +11,6 @@ export const SKILL_LABELS = {
 export type SkillLevel = keyof typeof SKILL_LABELS;
 
 export const SKILL_OPTIONS = Object.entries(SKILL_LABELS) as [SkillLevel, string][];
+
+/** 1..50 — the shared "players needed" range for the post form and the manage-page editor. */
+export const PLAYER_COUNT_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);

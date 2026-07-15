@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PLAYER_COUNT_OPTIONS } from "@/lib/skill";
 
 export function ManageActions({
   token, type, closed, playersNeeded,
@@ -54,7 +55,7 @@ export function ManageActions({
               value={players}
               onChange={(e) => { setPlayers(Number(e.target.value)); setUpdated(false); }}
             >
-              {Array.from({ length: 50 }, (_, i) => i + 1).map((n) => (
+              {PLAYER_COUNT_OPTIONS.map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>

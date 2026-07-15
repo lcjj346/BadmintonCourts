@@ -8,6 +8,7 @@ const config: Config = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testPathIgnorePatterns: ["<rootDir>/e2e/", "<rootDir>/.next/", "<rootDir>/src/lib/__tests__/helpers/"],
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
+  globalTeardown: "<rootDir>/jest.global-teardown.ts",
 };
 
 export default createJestConfig(config);

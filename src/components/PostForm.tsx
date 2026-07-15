@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/BottomSheet";
 import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
-import { todaySgt, maxPostDateSgt, nowSgtTime, TIME_OPTIONS } from "@/lib/time";
-import { SKILL_OPTIONS } from "@/lib/skill";
+import { todaySgt, maxPostDateSgt, nowSgtTime, TIME_OPTIONS, addHoursToTime } from "@/lib/time";
+import { SKILL_OPTIONS, PLAYER_COUNT_OPTIONS } from "@/lib/skill";
 
 const COUNTRY_CODES: [string, string][] = [
   ["+65", "SG"], ["+60", "MY"], ["+62", "ID"], ["+63", "PH"], ["+66", "TH"],
@@ -54,7 +54,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
   }, [isToday, nowTime, startTime]);
 
   const venueName = venues.find((v) => v.id === venueId)?.name;
-  const endTime = `${String(Math.min(23, parseInt(startTime) + duration)).padStart(2, "0")}:00`;
+  const endTime = addHoursToTime(startTime, duration);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -147,7 +147,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
         <div className="flex-1">
           <label className={label}>Hours</label>
           <select className={input} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-            {[1, 2, 3, 4].map((h) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((h) => (
               <option key={h} value={h}>{h}</option>
             ))}
           </select>
@@ -161,7 +161,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
         <>
           <label className={label}>Players needed</label>
           <select className={input} value={playersNeeded} onChange={(e) => setPlayersNeeded(Number(e.target.value))}>
-            {Array.from({ length: 50 }, (_, i) => i + 1).map((n) => (
+            {PLAYER_COUNT_OPTIONS.map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
@@ -207,9 +207,9 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       />
 
       <label className={label}>Your mobile number</label>
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <select
-          className={`${input} w-28 shrink-0`}
+          className="w-[5.5rem] shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm"
           aria-label="Country code"
           value={countryCode}
           onChange={(e) => setCountryCode(e.target.value)}
@@ -219,7 +219,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
           ))}
         </select>
         <input
-          className={input}
+          className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base tracking-wide"
           type="tel"
           inputMode="numeric"
           placeholder="9123 4567"
