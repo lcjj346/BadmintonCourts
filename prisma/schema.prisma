@@ -129,3 +129,8 @@ model VenueSuggestion {
   details   String?
   createdAt DateTime @default(now())
 }
+
+model Presence {
+  id       String   @id            // random client-generated UUID, no PII
+  lastSeen DateTime @default(now())
+}

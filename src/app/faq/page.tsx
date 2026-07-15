@@ -49,8 +49,8 @@ export default function FaqPage() {
 
         <Card title="How long does a post last?">
           <p>
-            A post stays visible until its court or game date passes, then it expires automatically.
-            Sold or filled posts remain visible (with a badge) until the date passes.
+            A post stays visible until its start time passes, then it expires automatically.
+            Sold or filled posts remain visible (with a badge) until their start time passes.
           </p>
           <p>Phone numbers are permanently deleted 7 days after a post expires.</p>
         </Card>

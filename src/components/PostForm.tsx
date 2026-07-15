@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/BottomSheet";
 import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
-import { todaySgt, maxPostDateSgt, TIME_OPTIONS } from "@/lib/time";
+import { todaySgt, maxPostDateSgt, nowSgtTime, TIME_OPTIONS } from "@/lib/time";
 import { SKILL_OPTIONS } from "@/lib/skill";
 
 const COUNTRY_CODES: [string, string][] = [
@@ -30,6 +30,29 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Client-only SGT clock (null during SSR/first paint to avoid hydration mismatch).
+  const [nowTime, setNowTime] = useState<string | null>(null);
+  useEffect(() => {
+    const tick = () => setNowTime(nowSgtTime());
+    tick();
+    const t = setInterval(tick, 30_000); // keep options fresh as time passes
+    return () => clearInterval(t);
+  }, []);
+
+  const isToday = date === todaySgt();
+  // When posting for today, only offer start times still in the future.
+  const timeOptions =
+    isToday && nowTime ? TIME_OPTIONS.filter((t) => t > nowTime) : TIME_OPTIONS;
+  const noSlotsToday = isToday && nowTime !== null && timeOptions.length === 0;
+
+  // Auto-fix the selection if the current start time has just passed.
+  useEffect(() => {
+    if (isToday && nowTime) {
+      const opts = TIME_OPTIONS.filter((t) => t > nowTime);
+      if (opts.length > 0 && !opts.includes(startTime)) setStartTime(opts[0]);
+    }
+  }, [isToday, nowTime, startTime]);
+
   const venueName = venues.find((v) => v.id === venueId)?.name;
   const endTime = `${String(Math.min(23, parseInt(startTime) + duration)).padStart(2, "0")}:00`;
 
@@ -37,6 +60,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
     e.preventDefault();
     setError(null);
     if (!venueId) return setError("Pick a venue");
+    if (noSlotsToday) return setError("No slots left today — pick another date");
     setSubmitting(true);
 
     const cents = free ? 0 : price === "" ? null : Math.round(parseFloat(price) * 100);
@@ -93,8 +117,10 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
         <a className="underline" href="/venue-request">Request it</a>
       </p>
 
-      <label className={label}>Date</label>
+      <label className={label} htmlFor="post-date">Date</label>
       <input
+        id="post-date"
+        aria-label="Date"
         className={input}
         type="date"
         value={date}
@@ -107,8 +133,13 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       <div className="flex gap-3">
         <div className="flex-1">
           <label className={label}>Start</label>
-          <select className={input} value={startTime} onChange={(e) => setStartTime(e.target.value)}>
-            {TIME_OPTIONS.map((t) => (
+          <select
+            className={input}
+            value={startTime}
+            disabled={noSlotsToday}
+            onChange={(e) => setStartTime(e.target.value)}
+          >
+            {timeOptions.map((t) => (
               <option key={t}>{t}</option>
             ))}
           </select>
@@ -122,6 +153,9 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
           </select>
         </div>
       </div>
+      {noSlotsToday && (
+        <p className="mt-1 text-xs text-amber-700">No slots left today — pick another date</p>
+      )}
 
       {kind === "game" && (
         <>
@@ -211,7 +245,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || noSlotsToday}
         className="mt-5 w-full rounded-xl bg-court py-3 font-semibold text-white disabled:opacity-50"
       >
         {submitting ? "Posting…" : kind === "court" ? "Post court" : "Post game"}

@@ -11,8 +11,11 @@ import {
 beforeEach(resetDb);
 afterAll(() => prisma.$disconnect());
 
+// Default fixture dated TOMORROW so a same-day expiry sweep can never race the test clock.
+const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
+
 const input = (venueId: string, over: Record<string, unknown> = {}) => ({
-  venueId, date: todaySgt(), startTime: "08:00", endTime: "10:00",
+  venueId, date: tomorrow, startTime: "08:00", endTime: "10:00",
   priceCents: 1600, phone: "+6591234567", ...over,
 }) as Parameters<typeof createListing>[0];
 
@@ -75,13 +78,21 @@ describe("listingService", () => {
     expect(veryOld.phone).toBeNull(); // >7 days past: scrubbed
   });
 
+  it("sweep expires a same-day slot once its start time has passed", async () => {
+    const venue = await makeVenue();
+    // Service create bypasses zod, so a today/00:00 row (already started) is possible.
+    const { id } = await createListing(input(venue.id, { date: todaySgt(), startTime: "00:00", endTime: "01:00" }));
+    await sweepExpired();
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id } })).status).toBe("EXPIRED");
+  });
+
   it("board hides expired, keeps SOLD visible sorted last", async () => {
     const venue = await makeVenue();
     const { id: soldId } = await createListing(input(venue.id, { startTime: "07:00", endTime: "09:00" }));
     await createListing(input(venue.id, { phone: "+6581234567" }));
     await prisma.listing.update({ where: { id: soldId }, data: { status: "SOLD" } });
 
-    const rows = await listListings({ date: todaySgt() });
+    const rows = await listListings({ date: tomorrow });
     expect(rows).toHaveLength(2);
     expect(rows[0].status).toBe("AVAILABLE");
     expect(rows[1].status).toBe("SOLD");
@@ -95,8 +106,8 @@ describe("listingService", () => {
 
   it("with no date filter, returns all upcoming dates ordered by date then status then startTime", async () => {
     const venue = await makeVenue();
-    const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
-    await createListing(input(venue.id, { date: tomorrow, startTime: "09:00" }));
+    const dayAfter = dayjs(todaySgt()).add(2, "day").format("YYYY-MM-DD");
+    await createListing(input(venue.id, { date: dayAfter, startTime: "09:00" }));
     await createListing(input(venue.id, { startTime: "20:00" }));
     await createListing(input(venue.id, { startTime: "07:00" }));
 

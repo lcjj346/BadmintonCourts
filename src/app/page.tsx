@@ -8,6 +8,7 @@ import { DateStrip } from "@/components/DateStrip";
 import { FilterBar } from "@/components/FilterBar";
 import { ListingCard } from "@/components/ListingCard";
 import { SessionCard } from "@/components/SessionCard";
+import { OnlineCount } from "@/components/OnlineCount";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +59,12 @@ export default async function BoardPage({
     <main>
       <header className="flex items-center justify-between pt-4">
         <h1 className="text-lg font-bold">🏸 BadmintonSG</h1>
-        <Link href="/faq" className="text-sm font-medium text-court underline">
-          FAQ
-        </Link>
+        <div className="flex items-center gap-3">
+          <OnlineCount />
+          <Link href="/faq" className="text-sm font-medium text-court underline">
+            FAQ
+          </Link>
+        </div>
       </header>
 
       <nav className="mt-2 flex border-b border-gray-200">

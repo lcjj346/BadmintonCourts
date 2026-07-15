@@ -1,10 +1,13 @@
 /** @jest-environment node */
+import dayjs from "dayjs";
 import { createListingSchema, createSessionSchema, boardFilterSchema } from "@/lib/schemas";
 import { todaySgt } from "@/lib/time";
 
+const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
+
 const base = {
   venueId: "3f0e37f5-2f3a-4a4a-9d4a-111111111111",
-  date: todaySgt(),
+  date: tomorrow,
   startTime: "08:00",
   endTime: "10:00",
   phone: "+6591234567",
@@ -47,6 +50,18 @@ describe("createListingSchema", () => {
 
   it("rejects endTime <= startTime", () => {
     expect(createListingSchema.safeParse({ ...base, startTime: "10:00", endTime: "08:00", priceCents: 0 }).success).toBe(false);
+  });
+
+  it("rejects a today start time that has already passed, accepts the same time tomorrow", () => {
+    const past = createListingSchema.safeParse({ ...base, date: todaySgt(), startTime: "00:00", priceCents: 0 });
+    expect(past.success).toBe(false);
+    if (!past.success) {
+      expect(past.error.issues[0].message).toBe(
+        "That start time has already passed — pick a later time or another day",
+      );
+      expect(past.error.issues[0].path).toEqual(["startTime"]);
+    }
+    expect(createListingSchema.safeParse({ ...base, date: tomorrow, startTime: "00:00", priceCents: 0 }).success).toBe(true);
   });
 
   it("rejects filled honeypot", () => {

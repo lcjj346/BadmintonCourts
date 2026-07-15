@@ -1,7 +1,12 @@
 /** @jest-environment node */
+import dayjs from "dayjs";
 import { prisma } from "@/lib/db";
 import { resetDb, makeVenue } from "@/lib/__tests__/helpers/db";
 import { todaySgt } from "@/lib/time";
+import { POST as presenceRoute } from "@/app/api/presence/route";
+
+// Bodies post TOMORROW so the same-day start-time-passed rule (schemas A2) never rejects them.
+const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
 import { POST as createListingRoute, GET as listListingsRoute } from "@/app/api/listings/route";
 import { POST as revealRoute } from "@/app/api/listings/[id]/reveal/route";
 import { POST as reportRoute } from "@/app/api/listings/[id]/report/route";
@@ -28,7 +33,7 @@ describe("listings API", () => {
   it("POST create → GET board (no phone) → reveal → manage close → delete", async () => {
     const venue = await makeVenue();
     const body = {
-      venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
+      venueId: venue.id, date: tomorrow, startTime: "08:00", endTime: "10:00",
       priceCents: 1600, phone: "+6591234567", website: "",
     };
 
@@ -37,7 +42,7 @@ describe("listings API", () => {
     const { data } = await createRes.json();
     expect(data.editToken).toBeTruthy();
 
-    const listRes = await listListingsRoute(new Request(`http://x/api/listings?date=${todaySgt()}`));
+    const listRes = await listListingsRoute(new Request(`http://x/api/listings?date=${tomorrow}`));
     const list = await listRes.json();
     expect(list.data).toHaveLength(1);
     expect(JSON.stringify(list.data)).not.toContain("+6591234567");
@@ -60,7 +65,7 @@ describe("listings API", () => {
   it("PATCH with a playersNeeded body updates a session; PATCH without body still closes", async () => {
     const venue = await makeVenue();
     const createRes = await createSessionRoute(req("http://x/api/sessions", "POST", {
-      venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
+      venueId: venue.id, date: tomorrow, startTime: "18:00", endTime: "20:00",
       playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: null,
       phone: "+6591234567", website: "",
     }));
@@ -85,7 +90,7 @@ describe("listings API", () => {
   it("PATCH with a playersNeeded body on a listing → 400", async () => {
     const venue = await makeVenue();
     const createRes = await createListingRoute(req("http://x/api/listings", "POST", {
-      venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
+      venueId: venue.id, date: tomorrow, startTime: "08:00", endTime: "10:00",
       priceCents: 0, phone: "+6591234567", website: "",
     }));
     const { data } = await createRes.json();
@@ -109,7 +114,7 @@ describe("listings API", () => {
   it("honeypot returns 201 but writes nothing", async () => {
     const venue = await makeVenue();
     const res = await createListingRoute(req("http://x/api/listings", "POST", {
-      venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
+      venueId: venue.id, date: tomorrow, startTime: "08:00", endTime: "10:00",
       priceCents: 0, phone: "+6591234567", website: "http://spam.example",
     }));
     expect(res.status).toBe(201);
@@ -125,7 +130,7 @@ describe("listings API", () => {
   it("report is idempotent per ip, but a different ip adds a second flag", async () => {
     const venue = await makeVenue();
     const createRes = await createListingRoute(req("http://x/api/listings", "POST", {
-      venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
+      venueId: venue.id, date: tomorrow, startTime: "08:00", endTime: "10:00",
       priceCents: 1600, phone: "+6591234567", website: "",
     }));
     const { data } = await createRes.json();
@@ -148,7 +153,7 @@ describe("sessions API", () => {
   it("POST create → GET board (no phone) → reveal", async () => {
     const venue = await makeVenue();
     const body = {
-      venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
+      venueId: venue.id, date: tomorrow, startTime: "18:00", endTime: "20:00",
       playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
       phone: "+6591234567", website: "",
     };
@@ -158,7 +163,7 @@ describe("sessions API", () => {
     const { data } = await createRes.json();
     expect(data.editToken).toBeTruthy();
 
-    const listRes = await listSessionsRoute(new Request(`http://x/api/sessions?date=${todaySgt()}`));
+    const listRes = await listSessionsRoute(new Request(`http://x/api/sessions?date=${tomorrow}`));
     const listJson = await listRes.json();
     expect(JSON.stringify(listJson)).not.toContain("+6591234567");
 
@@ -183,5 +188,18 @@ describe("venues API", () => {
     }));
     expect(res.status).toBe(201);
     expect(await prisma.venueSuggestion.count()).toBe(1);
+  });
+});
+
+describe("presence API", () => {
+  it("POST /api/presence with a uuid → 200 + numeric count; invalid body → 400", async () => {
+    const res = await presenceRoute(req("http://x/api/presence", "POST", {
+      id: "3f0e37f5-2f3a-4a4a-9d4a-111111111111",
+    }));
+    expect(res.status).toBe(200);
+    expect(typeof (await res.json()).data.count).toBe("number");
+
+    const bad = await presenceRoute(req("http://x/api/presence", "POST", { id: "not-a-uuid" }));
+    expect(bad.status).toBe(400);
   });
 });

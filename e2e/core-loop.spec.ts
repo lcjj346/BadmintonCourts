@@ -2,12 +2,22 @@ import { test, expect } from "@playwright/test";
 
 const PHONE = "91234567";
 
+// Post for TOMORROW (SGT) so the run is never time-of-day dependent: today's slots
+// would expire mid-suite once their start time passes. A strictly-future date also
+// keeps every start-time option selectable. Board defaults to all upcoming dates.
+function tomorrowSgt(): string {
+  const sgt = new Date(Date.now() + 8 * 3600 * 1000); // shift UTC → SGT wall clock
+  sgt.setUTCDate(sgt.getUTCDate() + 1);
+  return sgt.toISOString().slice(0, 10);
+}
+
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {
   // Post a court listing.
   await page.goto("/post/court");
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
@@ -56,6 +66,7 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
   await page.getByLabel("Skill level").selectOption("ADVANCED");
   await page.getByPlaceholder("9123 4567").fill("81234567");
   await page.getByRole("button", { name: /post game/i }).click();

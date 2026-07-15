@@ -12,6 +12,11 @@ export function todaySgt(): string {
   return dayjs().tz(SGT).format(FMT);
 }
 
+/** Current SGT wall-clock time as "HH:mm". */
+export function nowSgtTime(): string {
+  return dayjs().tz(SGT).format("HH:mm");
+}
+
 export function maxPostDateSgt(): string {
   return dayjs().tz(SGT).add(56, "day").format(FMT);
 }

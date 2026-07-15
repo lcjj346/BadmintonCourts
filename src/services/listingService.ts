@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { todaySgt, strToDate } from "@/lib/time";
+import { todaySgt, strToDate, nowSgtTime } from "@/lib/time";
 import type { BoardFilters, CreateListingInput } from "@/lib/schemas";
 
 export class ActivePostCapError extends Error {
@@ -25,16 +25,23 @@ const DAY_MS = 24 * 3600 * 1000;
 /** On-read sweep: expire past posts, scrub stale phones, prune rate-limit events. */
 export async function sweepExpired(): Promise<void> {
   const today = strToDate(todaySgt());
+  const now = nowSgtTime();
   const scrubBefore = new Date(today.getTime() - 7 * DAY_MS);
   const pruneBefore = new Date(Date.now() - DAY_MS);
 
+  // A slot expires once its start time passes: past dates, or today with startTime <= now (SGT).
+  const expiredWhere = {
+    status: { not: "EXPIRED" as const },
+    OR: [{ date: { lt: today } }, { date: today, startTime: { lte: now } }],
+  };
+
   await Promise.all([
     prisma.listing.updateMany({
-      where: { date: { lt: today }, status: { not: "EXPIRED" } },
+      where: expiredWhere,
       data: { status: "EXPIRED" },
     }),
     prisma.gameSession.updateMany({
-      where: { date: { lt: today }, status: { not: "EXPIRED" } },
+      where: expiredWhere,
       data: { status: "EXPIRED" },
     }),
     prisma.listing.updateMany({

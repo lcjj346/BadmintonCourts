@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { todaySgt, maxPostDateSgt } from "@/lib/time";
+import { todaySgt, maxPostDateSgt, nowSgtTime } from "@/lib/time";
 
 const SKILL_LEVELS = [
   "LOW_BEGINNER",
@@ -46,9 +46,18 @@ const postBase = z.object({
 const timeOrder = (v: { startTime: string; endTime: string }) => v.endTime > v.startTime;
 const TIME_ORDER_MSG = { message: "End time must be after start time", path: ["endTime"] };
 
+// Can't post a slot that has already started today. Future dates are unaffected.
+const futureStartToday = (v: { date: string; startTime: string }) =>
+  v.date !== todaySgt() || v.startTime > nowSgtTime();
+const FUTURE_START_MSG = {
+  message: "That start time has already passed — pick a later time or another day",
+  path: ["startTime"],
+};
+
 export const createListingSchema = postBase
   .extend({ priceCents: z.number().int().min(0).max(50_000).nullable() })
-  .refine(timeOrder, TIME_ORDER_MSG);
+  .refine(timeOrder, TIME_ORDER_MSG)
+  .refine(futureStartToday, FUTURE_START_MSG);
 
 export const createSessionSchema = postBase
   .extend({
@@ -56,7 +65,8 @@ export const createSessionSchema = postBase
     skillLevel: z.enum(SKILL_LEVELS),
     pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),
   })
-  .refine(timeOrder, TIME_ORDER_MSG);
+  .refine(timeOrder, TIME_ORDER_MSG)
+  .refine(futureStartToday, FUTURE_START_MSG);
 
 // Each field falls back to undefined (no filter) on an invalid value, so a stale or
 // hand-edited URL degrades gracefully instead of blanking the whole board.

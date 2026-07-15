@@ -8,8 +8,11 @@ import { createSession, listSessions, revealSessionPhone } from "@/services/sess
 beforeEach(resetDb);
 afterAll(() => prisma.$disconnect());
 
+// Default fixture dated TOMORROW so a same-day expiry sweep can never race the test clock.
+const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
+
 const input = (venueId: string, over: Record<string, unknown> = {}) => ({
-  venueId, date: todaySgt(), startTime: "18:00", endTime: "20:00",
+  venueId, date: tomorrow, startTime: "18:00", endTime: "20:00",
   playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
   phone: "+6591234567", ...over,
 }) as Parameters<typeof createSession>[0];
@@ -56,7 +59,7 @@ describe("sessionService", () => {
     await createSession(input(venue.id, { startTime: "18:00", endTime: "20:00", phone: "+6581234567" }));
     await prisma.gameSession.update({ where: { id: filled.id }, data: { status: "FILLED" } });
 
-    const rows = await listSessions({ date: todaySgt() });
+    const rows = await listSessions({ date: tomorrow });
     expect(rows).toHaveLength(2);
     expect(rows[0].status).toBe("OPEN");
     expect(rows[1].status).toBe("FILLED");
@@ -64,8 +67,8 @@ describe("sessionService", () => {
 
   it("with no date filter, returns all upcoming dates ordered by date then status then startTime", async () => {
     const venue = await makeVenue();
-    const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
-    await createSession(input(venue.id, { date: tomorrow, startTime: "09:00" }));
+    const dayAfter = dayjs(todaySgt()).add(2, "day").format("YYYY-MM-DD");
+    await createSession(input(venue.id, { date: dayAfter, startTime: "09:00" }));
     await createSession(input(venue.id, { startTime: "20:00", phone: "+6581234567" }));
 
     const rows = await listSessions({});
