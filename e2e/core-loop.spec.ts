@@ -63,14 +63,19 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await expect(page).toHaveURL(/\/manage\//);
   const manageUrl = page.url().split("?")[0];
 
-  // Players board shows the open game ("Needs 2").
+  // Poster edits "Players still needed" from the manage link → 1, and it sticks after refresh.
+  await page.getByLabel("Players still needed").selectOption("1");
+  await page.getByRole("button", { name: /^update$/i }).click();
+  await expect(page.getByLabel("Players still needed")).toHaveValue("1");
+
+  // Players board shows the open game with the updated count ("Needs 1").
   await page.goto("/?tab=players");
-  await expect(page.getByText(/needs 2/i).first()).toBeVisible();
+  await expect(page.getByText(/needs 1/i).first()).toBeVisible();
 
   // Skill filter → Advanced, game still shown.
   await page.getByRole("button", { name: /skill/i }).click();
   await page.getByRole("button", { name: /^Advanced$/ }).click();
-  await expect(page.getByText(/needs 2/i).first()).toBeVisible();
+  await expect(page.getByText(/needs 1/i).first()).toBeVisible();
 
   // Clean up so repeated runs don't hit the per-phone active-post cap.
   page.on("dialog", (d) => d.accept());

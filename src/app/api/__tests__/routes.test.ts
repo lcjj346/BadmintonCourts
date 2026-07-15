@@ -57,6 +57,47 @@ describe("listings API", () => {
     expect(await prisma.listing.count()).toBe(0);
   });
 
+  it("PATCH with a playersNeeded body updates a session; PATCH without body still closes", async () => {
+    const venue = await makeVenue();
+    const createRes = await createSessionRoute(req("http://x/api/sessions", "POST", {
+      venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
+      playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: null,
+      phone: "+6591234567", website: "",
+    }));
+    const { data } = await createRes.json();
+
+    const upd = await managePatch(
+      req(`http://x/api/manage/${data.editToken}`, "PATCH", { playersNeeded: 4 }),
+      params({ token: data.editToken }),
+    );
+    expect(upd.status).toBe(200);
+    expect((await prisma.gameSession.findFirstOrThrow()).playersNeeded).toBe(4);
+    expect((await prisma.gameSession.findFirstOrThrow()).status).toBe("OPEN");
+
+    const close = await managePatch(
+      req(`http://x/api/manage/${data.editToken}`, "PATCH"),
+      params({ token: data.editToken }),
+    );
+    expect(close.status).toBe(200);
+    expect((await prisma.gameSession.findFirstOrThrow()).status).toBe("FILLED");
+  });
+
+  it("PATCH with a playersNeeded body on a listing → 400", async () => {
+    const venue = await makeVenue();
+    const createRes = await createListingRoute(req("http://x/api/listings", "POST", {
+      venueId: venue.id, date: todaySgt(), startTime: "08:00", endTime: "10:00",
+      priceCents: 0, phone: "+6591234567", website: "",
+    }));
+    const { data } = await createRes.json();
+
+    const res = await managePatch(
+      req(`http://x/api/manage/${data.editToken}`, "PATCH", { playersNeeded: 4 }),
+      params({ token: data.editToken }),
+    );
+    expect(res.status).toBe(400);
+    expect((await prisma.listing.findFirstOrThrow()).status).toBe("AVAILABLE");
+  });
+
   it("rejects invalid body with 400 envelope", async () => {
     const res = await createListingRoute(req("http://x/api/listings", "POST", { phone: "123" }));
     expect(res.status).toBe(400);

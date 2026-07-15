@@ -5,13 +5,17 @@ export type ManagedPost = {
   type: "listing" | "session";
   post: {
     id: string; date: string; startTime: string; endTime: string;
-    status: string; venueName: string;
+    status: string; venueName: string; playersNeeded?: number;
   };
 };
 
 const MANAGE_SELECT = {
   id: true, date: true, startTime: true, endTime: true, status: true,
   venue: { select: { name: true } },
+} as const;
+
+const SESSION_MANAGE_SELECT = {
+  ...MANAGE_SELECT, playersNeeded: true,
 } as const;
 
 export async function findPostByToken(token: string): Promise<ManagedPost | null> {
@@ -29,7 +33,7 @@ export async function findPostByToken(token: string): Promise<ManagedPost | null
     };
   }
   const session = await prisma.gameSession.findUnique({
-    where: { editToken: token }, select: MANAGE_SELECT,
+    where: { editToken: token }, select: SESSION_MANAGE_SELECT,
   });
   if (session) {
     return {
@@ -38,10 +42,19 @@ export async function findPostByToken(token: string): Promise<ManagedPost | null
         id: session.id, date: dateToStr(session.date),
         startTime: session.startTime, endTime: session.endTime,
         status: session.status, venueName: session.venue.name,
+        playersNeeded: session.playersNeeded,
       },
     };
   }
   return null;
+}
+
+// Session posts only. Returns false for an unknown token or a listing-type post.
+export async function updatePlayersNeeded(token: string, playersNeeded: number): Promise<boolean> {
+  const found = await findPostByToken(token);
+  if (!found || found.type !== "session") return false;
+  await prisma.gameSession.update({ where: { editToken: token }, data: { playersNeeded } });
+  return true;
 }
 
 export async function closePostByToken(token: string): Promise<boolean> {

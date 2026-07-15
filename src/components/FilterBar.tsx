@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { BottomSheet } from "@/components/BottomSheet";
 import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
@@ -8,8 +8,10 @@ import { SKILL_OPTIONS } from "@/lib/skill";
 
 const REGIONS = ["NORTH", "SOUTH", "EAST", "WEST", "CENTRAL"] as const;
 
-const FROM_OPTIONS = Array.from({ length: 16 }, (_, i) => `${String(i + 7).padStart(2, "0")}:00`); // 07:00..22:00
-const TO_OPTIONS = Array.from({ length: 16 }, (_, i) => `${String(i + 8).padStart(2, "0")}:00`); // 08:00..23:00
+const DEFAULT_FROM = "07:00";
+const DEFAULT_TO = "18:00";
+const FROM_OPTIONS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`); // 00:00..23:00
+const TO_OPTIONS = Array.from({ length: 23 }, (_, i) => `${String(i + 1).padStart(2, "0")}:00`); // 01:00..23:00
 
 type SheetKey = "region" | "venue" | "time" | "skill" | null;
 
@@ -27,8 +29,18 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
   const available = params.get("available");
   const venueName = venues.find((v) => v.id === venueId)?.name;
 
-  const [fromSel, setFromSel] = useState(timeFrom ?? "08:00");
-  const [toSel, setToSel] = useState(timeTo ?? "18:00");
+  const [fromSel, setFromSel] = useState(timeFrom ?? DEFAULT_FROM);
+  const [toSel, setToSel] = useState(timeTo ?? DEFAULT_TO);
+
+  // When the Time sheet opens, sync the selects from the CURRENT URL params so a
+  // cleared filter doesn't show stale values.
+  useEffect(() => {
+    if (sheet === "time") {
+      setFromSel(params.get("timeFrom") ?? DEFAULT_FROM);
+      setToSel(params.get("timeTo") ?? DEFAULT_TO);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet]);
 
   function apply(entries: [string, string | null][]) {
     const next = new URLSearchParams(params);
@@ -116,6 +128,7 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
               onChange={(e) => setToSel(e.target.value)}
             >
               {TO_OPTIONS.map((t) => <option key={t}>{t}</option>)}
+              <option value="23:59">Midnight</option>
             </select>
           </label>
         </div>

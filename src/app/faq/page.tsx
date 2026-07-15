@@ -58,7 +58,8 @@ export default function FaqPage() {
         <Card title="How do I edit, mark sold/filled, or delete my post?">
           <p>
             Only through the secret manage link shown right after you post — there are no accounts,
-            so save that link.
+            so save that link. For games, you can also update the number of players still needed from
+            that manage link.
           </p>
           <p>
             If you lose it you can&apos;t edit the post, but it expires by itself after the date, and
@@ -84,7 +85,7 @@ export default function FaqPage() {
           </p>
           <p>
             It&apos;s deleted 7 days after your post expires, and IP addresses are stored only as
-            salted hashes for rate limiting. SG (+65) and MY (+60) numbers are supported.
+            salted hashes for rate limiting. SG (+65), MY (+60) and other regional numbers supported.
           </p>
         </Card>
       </div>

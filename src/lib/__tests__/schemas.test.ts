@@ -22,14 +22,20 @@ describe("createListingSchema", () => {
     expect(createListingSchema.safeParse({ ...base, priceCents: null }).success).toBe(true);
   });
 
-  it("accepts SG and MY phones", () => {
-    for (const phone of ["+6591234567", "+6581234567", "+60123456789", "+601234567890"]) {
+  it("accepts SG, MY and other regional phones", () => {
+    for (const phone of [
+      "+6591234567", "+6581234567", "+60123456789", "+601234567890",
+      "+62812345678", "+85251234567", "+15551234567",
+    ]) {
       expect(createListingSchema.safeParse({ ...base, phone, priceCents: 0 }).success).toBe(true);
     }
   });
 
   it("rejects invalid phones", () => {
-    for (const phone of ["1234567", "612345678", "9123456", "91234567", "+65712345", "+6071234567"]) {
+    for (const phone of [
+      "1234567", "612345678", "9123456", "91234567", "+65712345", "+6071234567",
+      "+999123456", "+65 9123", "60123456789",
+    ]) {
       expect(createListingSchema.safeParse({ ...base, phone, priceCents: 0 }).success).toBe(false);
     }
   });

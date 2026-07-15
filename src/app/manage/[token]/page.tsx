@@ -31,7 +31,8 @@ export default async function ManagePage({
           <h1 className="font-bold text-court">🎉 Posted!</h1>
           <p className="mt-1 text-sm text-court">
             <strong>Save this page&apos;s link.</strong> It&apos;s the only way to mark your post
-            {type === "listing" ? " sold" : " filled"} or delete it — there&apos;s no login.
+            {type === "listing" ? " sold" : " filled"}
+            {type === "session" ? ", update players needed," : ""} or delete it — there&apos;s no login.
           </p>
           <CopyLinkButton />
         </div>
@@ -45,7 +46,7 @@ export default async function ManagePage({
         <p className="mt-1 text-sm text-gray-500">
           {formatDateLabel(post.date)} · {post.startTime}–{post.endTime}
         </p>
-        <ManageActions token={token} type={type} closed={closed} />
+        <ManageActions token={token} type={type} closed={closed} playersNeeded={post.playersNeeded} />
       </div>
 
       <Link href="/" className="mt-4 block text-center text-sm text-gray-400">← Back to the board</Link>

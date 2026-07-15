@@ -7,6 +7,12 @@ import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
 import { todaySgt, maxPostDateSgt, TIME_OPTIONS } from "@/lib/time";
 import { SKILL_OPTIONS } from "@/lib/skill";
 
+const COUNTRY_CODES: [string, string][] = [
+  ["+65", "SG"], ["+60", "MY"], ["+62", "ID"], ["+63", "PH"], ["+66", "TH"],
+  ["+84", "VN"], ["+91", "IN"], ["+852", "HK"], ["+886", "TW"], ["+86", "CN"],
+  ["+61", "AU"], ["+44", "UK"], ["+1", "US"],
+];
+
 export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: VenueOption[] }) {
   const router = useRouter();
   const [venueId, setVenueId] = useState<string | null>(null);
@@ -35,7 +41,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
 
     const cents = free ? 0 : price === "" ? null : Math.round(parseFloat(price) * 100);
     let local = phone.replace(/\D/g, "");
-    if (countryCode === "+60") local = local.replace(/^0/, "");
+    if (countryCode !== "+65") local = local.replace(/^0/, "");
     const e164 = `${countryCode}${local}`;
     const body =
       kind === "court"
@@ -169,13 +175,14 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       <label className={label}>Your mobile number</label>
       <div className="flex gap-3">
         <select
-          className={`${input} w-20 shrink-0`}
+          className={`${input} w-28 shrink-0`}
           aria-label="Country code"
           value={countryCode}
           onChange={(e) => setCountryCode(e.target.value)}
         >
-          <option value="+65">+65</option>
-          <option value="+60">+60</option>
+          {COUNTRY_CODES.map(([code, cc]) => (
+            <option key={code} value={code}>{`${code} (${cc})`}</option>
+          ))}
         </select>
         <input
           className={input}
@@ -195,6 +202,13 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+      <div className="mt-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
+        📌 After posting you&apos;ll get a <strong>private manage link</strong> — it&apos;s the only
+        way to edit players needed, mark as sold/filled, or delete your post. Save it before sharing
+        your court.
+      </div>
+
       <button
         type="submit"
         disabled={submitting}

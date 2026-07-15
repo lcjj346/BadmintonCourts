@@ -14,8 +14,8 @@ const SKILL_LEVELS = [
 export const phoneSchema = z
   .string()
   .regex(
-    /^\+65[89]\d{7}$|^\+601\d{7,9}$/,
-    "Enter a valid Singapore (+65) or Malaysia (+60) mobile number",
+    /^\+65[89]\d{7}$|^\+601\d{7,9}$|^\+(?:1|44|61|62|63|66|84|86|91|852|886)\d{6,12}$/,
+    "Enter a valid mobile number with country code",
   );
 
 const timeStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);

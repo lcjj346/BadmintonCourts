@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+// Longest-first so e.g. +852 matches before +85/+8 would (none overlap here, but safe).
+const COUNTRY_CODES = ["+852", "+886", "+65", "+60", "+62", "+63", "+66", "+84", "+91", "+86", "+61", "+44", "+1"]
+  .sort((a, b) => b.length - a.length);
+
 export function RevealButton({ endpoint }: { endpoint: string }) {
   const [phone, setPhone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,10 +32,9 @@ export function RevealButton({ endpoint }: { endpoint: string }) {
     if (phone.startsWith("+65")) {
       const local = phone.slice(3);
       pretty = `+65 ${local.slice(0, 4)} ${local.slice(4)}`;
-    } else if (phone.startsWith("+60")) {
-      pretty = `+60 ${phone.slice(3)}`;
     } else {
-      pretty = phone;
+      const code = COUNTRY_CODES.find((c) => phone.startsWith(c));
+      pretty = code ? `${code} ${phone.slice(code.length)}` : phone;
     }
     return (
       <div className="rounded-xl bg-court-light p-4 text-center">
