@@ -7,6 +7,7 @@ export async function resetDb() {
   await prisma.listing.deleteMany();
   await prisma.gameSession.deleteMany();
   await prisma.venueSuggestion.deleteMany();
+  await prisma.presence.deleteMany();
   await prisma.venue.deleteMany();
 }
 

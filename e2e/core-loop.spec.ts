@@ -2,12 +2,22 @@ import { test, expect } from "@playwright/test";
 
 const PHONE = "91234567";
 
+// Post for TOMORROW (SGT) so the run is never time-of-day dependent: today's slots
+// would expire mid-suite once their start time passes. A strictly-future date also
+// keeps every start-time option selectable. Board defaults to all upcoming dates.
+function tomorrowSgt(): string {
+  const sgt = new Date(Date.now() + 8 * 3600 * 1000); // shift UTC → SGT wall clock
+  sgt.setUTCDate(sgt.getUTCDate() + 1);
+  return sgt.toISOString().slice(0, 10);
+}
+
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {
   // Post a court listing.
   await page.goto("/post/court");
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
@@ -56,6 +66,7 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
   await page.getByLabel("Skill level").selectOption("ADVANCED");
   await page.getByPlaceholder("9123 4567").fill("81234567");
   await page.getByRole("button", { name: /post game/i }).click();
@@ -63,14 +74,19 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await expect(page).toHaveURL(/\/manage\//);
   const manageUrl = page.url().split("?")[0];
 
-  // Players board shows the open game ("Needs 2").
+  // Poster edits "Players still needed" from the manage link → 1, and it sticks after refresh.
+  await page.getByLabel("Players still needed").selectOption("1");
+  await page.getByRole("button", { name: /^update$/i }).click();
+  await expect(page.getByLabel("Players still needed")).toHaveValue("1");
+
+  // Players board shows the open game with the updated count ("Needs 1").
   await page.goto("/?tab=players");
-  await expect(page.getByText(/needs 2/i).first()).toBeVisible();
+  await expect(page.getByText(/needs 1/i).first()).toBeVisible();
 
   // Skill filter → Advanced, game still shown.
   await page.getByRole("button", { name: /skill/i }).click();
   await page.getByRole("button", { name: /^Advanced$/ }).click();
-  await expect(page.getByText(/needs 2/i).first()).toBeVisible();
+  await expect(page.getByText(/needs 1/i).first()).toBeVisible();
 
   // Clean up so repeated runs don't hit the per-phone active-post cap.
   page.on("dialog", (d) => d.accept());

@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { todaySgt, strToDate } from "@/lib/time";
+import { todaySgt, strToDate, nowSgtTime } from "@/lib/time";
 import type { BoardFilters, CreateListingInput } from "@/lib/schemas";
 
 export class ActivePostCapError extends Error {
@@ -25,16 +25,23 @@ const DAY_MS = 24 * 3600 * 1000;
 /** On-read sweep: expire past posts, scrub stale phones, prune rate-limit events. */
 export async function sweepExpired(): Promise<void> {
   const today = strToDate(todaySgt());
+  const now = nowSgtTime();
   const scrubBefore = new Date(today.getTime() - 7 * DAY_MS);
   const pruneBefore = new Date(Date.now() - DAY_MS);
 
+  // A slot expires once its start time passes: past dates, or today with startTime <= now (SGT).
+  const expiredWhere = {
+    status: { not: "EXPIRED" as const },
+    OR: [{ date: { lt: today } }, { date: today, startTime: { lte: now } }],
+  };
+
   await Promise.all([
     prisma.listing.updateMany({
-      where: { date: { lt: today }, status: { not: "EXPIRED" } },
+      where: expiredWhere,
       data: { status: "EXPIRED" },
     }),
     prisma.gameSession.updateMany({
-      where: { date: { lt: today }, status: { not: "EXPIRED" } },
+      where: expiredWhere,
       data: { status: "EXPIRED" },
     }),
     prisma.listing.updateMany({
@@ -49,24 +56,26 @@ export async function sweepExpired(): Promise<void> {
   ]);
 }
 
-export const TIME_RANGES = {
-  MORNING: { lt: "12:00" },
-  AFTERNOON: { gte: "12:00", lt: "18:00" },
-  EVENING: { gte: "18:00" },
-} as const;
-
 export async function listListings(filters: BoardFilters): Promise<PublicListing[]> {
   await sweepExpired();
   return prisma.listing.findMany({
     where: {
-      date: strToDate(filters.date ?? todaySgt()),
-      status: { in: ["AVAILABLE", "SOLD"] },
+      date: filters.date ? strToDate(filters.date) : { gte: strToDate(todaySgt()) },
+      status: filters.available ? "AVAILABLE" : { in: ["AVAILABLE", "SOLD"] },
       ...(filters.venueId ? { venueId: filters.venueId } : {}),
       ...(filters.region ? { venue: { region: filters.region } } : {}),
-      ...(filters.time ? { startTime: TIME_RANGES[filters.time] } : {}),
+      ...(filters.timeFrom || filters.timeTo
+        ? {
+            startTime: {
+              ...(filters.timeFrom ? { gte: filters.timeFrom } : {}),
+              ...(filters.timeTo ? { lt: filters.timeTo } : {}),
+            },
+          }
+        : {}),
     },
     select: PUBLIC_LISTING_SELECT,
-    orderBy: [{ status: "asc" }, { startTime: "asc" }], // Postgres enums sort by declared order (AVAILABLE, SOLD); asc puts AVAILABLE first
+    // Postgres enums sort by declared order (AVAILABLE, SOLD); asc puts AVAILABLE first
+    orderBy: [{ date: "asc" }, { status: "asc" }, { startTime: "asc" }],
   });
 }
 

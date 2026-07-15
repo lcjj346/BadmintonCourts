@@ -14,7 +14,7 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
   if (!listing) notFound();
 
   return (
-    <main className="pt-6">
+    <main className="mx-auto w-full max-w-lg pt-6">
       <Link href="/" className="text-sm text-gray-400">← Back to courts</Link>
       <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-4">
         <div className="flex items-start justify-between">

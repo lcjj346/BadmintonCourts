@@ -2,7 +2,7 @@ import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 
 // Test phone numbers used by the core-loop specs.
-const TEST_PHONES = ["91234567", "81234567"];
+const TEST_PHONES = ["+6591234567", "+6581234567"];
 
 /**
  * Reset test-environment state before the E2E run so the suite is

@@ -36,8 +36,12 @@ enum SessionStatus {
 }
 
 enum SkillLevel {
-  BEGINNER
-  INTERMEDIATE
+  LOW_BEGINNER
+  MID_BEGINNER
+  HIGH_BEGINNER
+  LOW_INTERMEDIATE
+  MID_INTERMEDIATE
+  HIGH_INTERMEDIATE
   ADVANCED
 }
 
@@ -124,4 +128,9 @@ model VenueSuggestion {
   name      String
   details   String?
   createdAt DateTime @default(now())
+}
+
+model Presence {
+  id       String   @id            // random client-generated UUID, no PII
+  lastSeen DateTime @default(now())
 }
