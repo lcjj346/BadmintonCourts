@@ -18,13 +18,13 @@ describe("ListingCard", () => {
     expect(screen.getByRole("link")).toHaveAttribute("href", "/listing/l1");
   });
 
-  it("renders Free, SOLD badge, and school availability note", () => {
+  it("renders Free and SOLD badge; availabilityNote is not shown on the card (keeps card heights uniform)", () => {
     render(<ListingCard listing={{
       ...listing, priceCents: 0, status: "SOLD" as const,
       venue: { ...listing.venue, venueType: "SCHOOL" as const, availabilityNote: "Weekends & school holidays only" },
     }} />);
     expect(screen.getByText("Free")).toBeInTheDocument();
     expect(screen.getByText("SOLD")).toBeInTheDocument();
-    expect(screen.getByText(/Weekends & school holidays/)).toBeInTheDocument();
+    expect(screen.queryByText(/Weekends & school holidays/)).not.toBeInTheDocument();
   });
 });

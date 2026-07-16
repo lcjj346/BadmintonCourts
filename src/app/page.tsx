@@ -103,9 +103,11 @@ export default async function BoardPage({
       <Link
         href="/post"
         aria-label="Post"
-        className="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-court text-2xl text-white shadow-lg"
+        className="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-court text-white shadow-lg transition-transform hover:scale-105 hover:shadow-xl active:scale-95"
       >
-        +
+        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
       </Link>
     </main>
   );

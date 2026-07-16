@@ -15,7 +15,6 @@ export function SessionCard({ session }: { session: PublicSession }) {
       startTime={session.startTime}
       endTime={session.endTime}
       region={venue.region}
-      availabilityNote={venue.availabilityNote}
       priceNode={
         <>
           {formatPrice(session.pricePerPlayerCents)}

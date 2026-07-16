@@ -14,7 +14,6 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
       startTime={listing.startTime}
       endTime={listing.endTime}
       region={venue.region}
-      availabilityNote={venue.availabilityNote}
       priceNode={formatPrice(listing.priceCents)}
     />
   );

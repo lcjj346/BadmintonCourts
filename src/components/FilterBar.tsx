@@ -60,8 +60,10 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
   const timeLabel = timeActive ? `${timeFrom ?? "…"}–${timeTo ?? "…"} ✕` : "Time ▾";
 
   const chipClass = (active: boolean) =>
-    `shrink-0 rounded-full border px-3 py-1 text-xs ${
-      active ? "border-court bg-court text-white" : "border-gray-300 bg-white text-gray-600"
+    `shrink-0 rounded-full border px-3 py-1 text-xs transition-colors ${
+      active
+        ? "border-court bg-court text-white hover:bg-court/90"
+        : "border-gray-300 bg-white text-gray-600 hover:border-court hover:bg-court-light/60 hover:text-court"
     }`;
 
   const chip = (label: string, active: string | null, key: SheetKey, paramKey: string) => (
@@ -71,14 +73,16 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
   );
 
   const pill = (selected: boolean) =>
-    `mr-2 mb-2 rounded-full border px-3 py-1.5 text-sm ${
-      selected ? "border-court bg-court-light font-semibold text-court" : "border-gray-300"
+    `mr-2 mb-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+      selected
+        ? "border-court bg-court-light font-semibold text-court"
+        : "border-gray-300 hover:border-court hover:bg-court-light/60"
     }`;
 
   const applyDisabled = toSel <= fromSel;
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-3">
+    <div className="flex gap-2 overflow-x-auto pb-3 pt-2">
       {chip("Region", region, "region", "region")}
       {chip("Venue", venueName ?? null, "venue", "venueId")}
 
@@ -139,13 +143,13 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
           <button
             disabled={applyDisabled}
             onClick={() => apply([["timeFrom", fromSel], ["timeTo", toSel]])}
-            className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white disabled:opacity-50"
+            className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white transition-colors hover:bg-court/90 disabled:opacity-50"
           >
             Apply
           </button>
           <button
             onClick={() => apply([["timeFrom", null], ["timeTo", null]])}
-            className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600"
+            className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50"
           >
             Clear
           </button>
