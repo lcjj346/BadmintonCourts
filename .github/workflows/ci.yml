@@ -105,6 +105,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      # `npm run build`'s own build script now runs `prisma migrate deploy` before
+      # `next build`, so Vercel's own build is the primary, atomic place migrations
+      # actually apply — no more race between this job and Vercel's independent
+      # deploy. This step is a defensive backup only (e.g. Vercel build skipped/
+      # disabled) — safe to run twice since migrate deploy is idempotent.
       # Overrides the throwaway-Postgres DATABASE_URL/DIRECT_URL set at workflow level above —
       # this is the one job in this file that's meant to touch the real database.
       - name: Apply migrations to production

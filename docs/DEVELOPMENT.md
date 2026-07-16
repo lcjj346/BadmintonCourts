@@ -352,24 +352,26 @@ compute after a few minutes of inactivity and wakes itself on the next query —
 > Vercel's Hobby tier is non-commercial — fine while the app is free to use. Growth triggers:
 > Neon's paid tier (usage-based, from ~$5) then Vercel Pro ($20), at roughly 10× traffic.
 
-### Migrations deploy automatically on merge
+### Migrations deploy automatically, atomically with every Vercel build
 
-`.github/workflows/ci.yml`'s `migrate-production` job runs `prisma migrate deploy` (then
-reseeds venues) against production, but only after a **push to `main`** — never on a pull
-request — and only after the `test` and `e2e` jobs both pass. This exists because forgetting
-to run `npm run prod:migrate` before/after a merge is exactly what broke production twice
-(`GameSession`/`Listing` batch-token migration, then the presence/custom-venue migrations) —
-the deployed Vercel code expected columns the database didn't have yet.
+`npm run build` (the exact command Vercel runs, via `package.json`'s `build` script) now runs
+`prisma migrate deploy` immediately before `next build`. This is the primary mechanism: every
+Vercel deploy migrates the database as an inseparable part of that same build, so there's no
+window where new code can run against an old schema.
 
-**Known gap:** Vercel's own deploy (triggered by the same push) runs independently of this
-job, so there's a race — if Vercel's build finishes and serves traffic before
-`migrate-production` completes, requests can 500 for that window, self-healing once the
-migration lands. All schema changes in this repo are written to be additive/backfill-safe
-(see the migration files for the pattern: add nullable, backfill, then tighten — never a bare
-`NOT NULL` on a possibly non-empty table), so the failure mode is "briefly serves 500s," not
-data loss or corruption. Tightening this further (e.g. gating the Vercel deploy on the
-migration job via a deploy hook) is a reasonable next step if the race becomes a real problem
-in practice.
+`.github/workflows/ci.yml` also has a `migrate-production` job that runs `prisma migrate
+deploy` (then reseeds venues) against production, after a **push to `main`** — never on a
+pull request — and only after `test`/`e2e` both pass. This is now a defensive backup (e.g. if
+a Vercel build is skipped or manually disabled) rather than the primary mechanism — safe to
+run twice, since `migrate deploy` is idempotent. This whole setup exists because forgetting to
+migrate before/after a merge is exactly what broke production twice (`GameSession`/`Listing`
+batch-token migration, then the presence/custom-venue migrations) — the deployed code expected
+columns the database didn't have yet.
+
+All schema changes in this repo are additive/backfill-safe regardless (see the migration files
+for the pattern: add nullable, backfill, then tighten — never a bare `NOT NULL` on a possibly
+non-empty table), so even a hypothetical migration hiccup fails safe as "briefly serves 500s,"
+never data loss or corruption.
 
 ---
 

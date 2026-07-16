@@ -228,7 +228,10 @@ test("posts two courts in one batch under a single manage link", async ({ page }
   // deleting the last returns to the board.
   await page.goto(manageUrl);
   await deletePost(page);
-  await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1);
+  // Deleting triggers router.refresh(), a fire-and-forget RSC re-fetch that
+  // occasionally takes longer than the default 5s assertion window under load —
+  // a generous timeout here absorbs that instead of flaking on a slow refresh.
+  await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1, { timeout: 15_000 });
   await deletePost(page);
   await expect(page).toHaveURL("/");
 });
@@ -271,7 +274,10 @@ test("can't reach 'add another' before saving the manage link, and adding one re
 
   // Clean up so repeated runs don't hit the per-phone active-post cap.
   await deletePost(page);
-  await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1);
+  // Deleting triggers router.refresh(), a fire-and-forget RSC re-fetch that
+  // occasionally takes longer than the default 5s assertion window under load —
+  // a generous timeout here absorbs that instead of flaking on a slow refresh.
+  await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1, { timeout: 15_000 });
   await deletePost(page);
   await expect(page).toHaveURL("/");
 });
