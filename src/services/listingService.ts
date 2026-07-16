@@ -1,17 +1,12 @@
-import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todaySgt, strToDate, nowSgtTime } from "@/lib/time";
 import type { BoardFilters, CreateListingItemInput } from "@/lib/schemas";
+import { assertUnderActiveCap, newBatchToken, createBatch, ActivePostCapError } from "@/services/batchService";
 
-export class ActivePostCapError extends Error {
-  constructor() {
-    super("This phone number already has 5 active posts");
-    this.name = "ActivePostCapError";
-  }
-}
+export { ActivePostCapError };
 
-export const PUBLIC_LISTING_SELECT = {
+const PUBLIC_LISTING_SELECT = {
   id: true, date: true, startTime: true, endTime: true,
   priceCents: true, notes: true, status: true, createdAt: true,
   venue: {
@@ -84,35 +79,33 @@ export async function getListing(id: string): Promise<PublicListing | null> {
   return prisma.listing.findUnique({ where: { id }, select: PUBLIC_LISTING_SELECT });
 }
 
+function listingCreator(item: CreateListingItemInput, phone: string, batchToken: string) {
+  return prisma.listing.create({
+    data: {
+      venueId: item.venueId,
+      date: strToDate(item.date),
+      startTime: item.startTime,
+      endTime: item.endTime,
+      priceCents: item.priceCents,
+      notes: item.notes,
+      phone,
+      batchToken,
+    },
+    select: { id: true },
+  });
+}
+
 /** Creates every item under one shared batchToken — the manage link for all of them. */
 export async function createListingBatch(
   items: CreateListingItemInput[],
   phone: string,
 ): Promise<{ batchToken: string; ids: string[] }> {
-  const active = await prisma.listing.count({
-    where: { phone, status: "AVAILABLE" },
-  });
-  if (active + items.length > 5) throw new ActivePostCapError();
+  const active = await prisma.listing.count({ where: { phone, status: "AVAILABLE" } });
+  assertUnderActiveCap(active, items.length);
 
-  const batchToken = randomUUID();
-  const rows = await prisma.$transaction(
-    items.map((item) =>
-      prisma.listing.create({
-        data: {
-          venueId: item.venueId,
-          date: strToDate(item.date),
-          startTime: item.startTime,
-          endTime: item.endTime,
-          priceCents: item.priceCents,
-          notes: item.notes,
-          phone,
-          batchToken,
-        },
-        select: { id: true },
-      }),
-    ),
-  );
-  return { batchToken, ids: rows.map((r) => r.id) };
+  const batchToken = newBatchToken();
+  const ids = await createBatch(items.map((item) => listingCreator(item, phone, batchToken)));
+  return { batchToken, ids };
 }
 
 /** Appends more listings to an existing manage link, reusing its phone. Null if the token is unknown or scrubbed. */
@@ -125,26 +118,10 @@ export async function addListingsToBatch(
   const phone = existing.phone;
 
   const active = await prisma.listing.count({ where: { phone, status: "AVAILABLE" } });
-  if (active + items.length > 5) throw new ActivePostCapError();
+  assertUnderActiveCap(active, items.length);
 
-  const rows = await prisma.$transaction(
-    items.map((item) =>
-      prisma.listing.create({
-        data: {
-          venueId: item.venueId,
-          date: strToDate(item.date),
-          startTime: item.startTime,
-          endTime: item.endTime,
-          priceCents: item.priceCents,
-          notes: item.notes,
-          phone,
-          batchToken,
-        },
-        select: { id: true },
-      }),
-    ),
-  );
-  return { ids: rows.map((r) => r.id) };
+  const ids = await createBatch(items.map((item) => listingCreator(item, phone, batchToken)));
+  return { ids };
 }
 
 export async function revealListingPhone(id: string): Promise<string | null> {

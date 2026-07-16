@@ -1,4 +1,4 @@
-export const SKILL_LABELS = {
+const SKILL_LABELS = {
   LOW_BEGINNER: "Low Beginner",
   MID_BEGINNER: "Mid Beginner",
   HIGH_BEGINNER: "High Beginner",

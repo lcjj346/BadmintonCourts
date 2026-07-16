@@ -11,7 +11,7 @@ const SKILL_LEVELS = [
   "ADVANCED",
 ] as const;
 
-export const phoneSchema = z
+const phoneSchema = z
   .string()
   .regex(
     /^\+65[89]\d{7}$|^\+601\d{7,9}$|^\+(?:1|44|61|62|63|66|84|86|91|852|886)\d{6,12}$/,
@@ -65,7 +65,7 @@ const createListingItemBase = itemBase.extend({
   venueId: z.string().uuid(),
   priceCents: z.number().int().min(0).max(50_000).nullable(),
 });
-export const createListingItemSchema = createListingItemBase
+const createListingItemSchema = createListingItemBase
   .refine(timeOrder, TIME_ORDER_MSG)
   .refine(futureStartToday, FUTURE_START_MSG);
 
@@ -76,7 +76,7 @@ const createSessionItemBase = itemBase.extend({
   skillMax: z.enum(SKILL_LEVELS),
   pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),
 });
-export const createSessionItemSchema = createSessionItemBase
+const createSessionItemSchema = createSessionItemBase
   .refine(timeOrder, TIME_ORDER_MSG)
   .refine(futureStartToday, FUTURE_START_MSG)
   .refine(skillOrder, SKILL_ORDER_MSG);
@@ -138,8 +138,6 @@ export const venueSuggestionSchema = z.object({
 
 export type CreateListingItemInput = z.infer<typeof createListingItemSchema>;
 export type CreateSessionItemInput = z.infer<typeof createSessionItemSchema>;
-export type CreateListingInput = z.infer<typeof createListingSchema>;
-export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type EditListingInput = z.infer<typeof editListingSchema>;
 export type EditSessionInput = z.infer<typeof editSessionSchema>;
 export type BoardFilters = z.infer<typeof boardFilterSchema>;
