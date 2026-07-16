@@ -36,9 +36,28 @@ body {
   animation: sheet-rise 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Save-link nudge: a slow-breathing spotlight dim behind the manage-link card,
+   plus a small cursor icon drifting over the button to draw the eye to it. */
+@keyframes spotlight-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.68; }
+}
+.spotlight-dim {
+  animation: spotlight-pulse 3.2s ease-in-out infinite;
+}
+@keyframes pointer-drift {
+  0%, 100% { transform: translate(-16px, -50%); }
+  50% { transform: translate(16px, -50%); }
+}
+.pointer-drift {
+  animation: pointer-drift 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sheet-backdrop,
-  .sheet-panel {
+  .sheet-panel,
+  .spotlight-dim,
+  .pointer-drift {
     animation: none;
   }
 }
