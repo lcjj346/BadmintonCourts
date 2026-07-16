@@ -316,27 +316,51 @@ compute after a few minutes of inactivity and wakes itself on the next query —
    - **Direct connection** (same host, no `-pooler`) → production `DIRECT_URL`, used by Prisma
      for migrations.
 2. **Save both into `.env.production.local`** (see [Local development](#local-development)
-   above), then apply schema + seed:
+   above), then apply schema + seed once by hand for the initial setup:
    ```bash
    npm run prod:migrate
    npm run prod:seed
    ```
-3. **Create a Vercel project** from this repo. Set env vars in the Vercel dashboard:
+3. **Add the same two connection strings as GitHub Actions secrets** — Settings → Secrets and
+   variables → Actions → New repository secret — named `PROD_DATABASE_URL` and
+   `PROD_DIRECT_URL`. This is what lets CI apply migrations automatically on every merge (next
+   step); skip it and the `migrate-production` job just fails safely (missing secrets), it won't
+   touch anything.
+4. **Create a Vercel project** from this repo. Set env vars in the Vercel dashboard:
    `DATABASE_URL` (pooled), `DIRECT_URL` (direct), `IP_HASH_SALT` (`openssl rand -hex 32`,
    don't reuse your local dev value).
-4. **Deploy** (`npx vercel --prod` or push to the connected branch). The build script runs
+5. **Deploy** (`npx vercel --prod` or push to the connected branch). The build script runs
    `prisma generate && next build`, so the deployed Prisma Client always matches
    `schema.prisma` — don't drop the `prisma generate` step even if it looks redundant with
    `npm ci`'s own postinstall, since a cached `node_modules` on Vercel can otherwise ship a
    stale client after a schema change.
-5. **Smoke test** on the production URL: post a listing, reveal it from another browser, mark
+6. **Smoke test** on the production URL: post a listing, reveal it from another browser, mark
    it sold, delete it. Confirm `/api/listings` responses contain no `phone` field.
-6. **Region latency**: if the app feels slow, check that your Vercel project's function region
+7. **Region latency**: if the app feels slow, check that your Vercel project's function region
    is close to your Neon region (e.g. Singapore `sin1`) — a mismatch adds a cross-region round
    trip to every database query.
 
 > Vercel's Hobby tier is non-commercial — fine while the app is free to use. Growth triggers:
 > Neon's paid tier (usage-based, from ~$5) then Vercel Pro ($20), at roughly 10× traffic.
+
+### Migrations deploy automatically on merge
+
+`.github/workflows/ci.yml`'s `migrate-production` job runs `prisma migrate deploy` (then
+reseeds venues) against production, but only after a **push to `main`** — never on a pull
+request — and only after the `test` and `e2e` jobs both pass. This exists because forgetting
+to run `npm run prod:migrate` before/after a merge is exactly what broke production twice
+(`GameSession`/`Listing` batch-token migration, then the presence/custom-venue migrations) —
+the deployed Vercel code expected columns the database didn't have yet.
+
+**Known gap:** Vercel's own deploy (triggered by the same push) runs independently of this
+job, so there's a race — if Vercel's build finishes and serves traffic before
+`migrate-production` completes, requests can 500 for that window, self-healing once the
+migration lands. All schema changes in this repo are written to be additive/backfill-safe
+(see the migration files for the pattern: add nullable, backfill, then tighten — never a bare
+`NOT NULL` on a possibly non-empty table), so the failure mode is "briefly serves 500s," not
+data loss or corruption. Tightening this further (e.g. gating the Vercel deploy on the
+migration job via a deploy hook) is a reasonable next step if the race becomes a real problem
+in practice.
 
 ---
 
