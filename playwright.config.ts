@@ -5,7 +5,9 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   timeout: 30_000,
   use: { baseURL: "http://localhost:3000" },
-  projects: [{ name: "mobile-chrome", use: { ...devices["Pixel 7"] } }],
+  projects: [
+    { name: "mobile-chrome", use: { ...devices["Pixel 7"], permissions: ["clipboard-write"] } },
+  ],
   webServer: {
     command: "npm run dev",
     url: "http://localhost:3000",
