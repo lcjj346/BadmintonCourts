@@ -249,3 +249,37 @@ test("posts with only a Telegram handle (no phone), reveals a Telegram link, and
   await page.getByRole("button", { name: /delete post/i }).click();
   await expect(page).toHaveURL("/");
 });
+
+test("editing a post can switch its contact from phone to Telegram", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  const handle = `edited_user_${Date.now()}`;
+
+  await page.goto("/post/court");
+  await page.getByRole("button", { name: /choose a venue/i }).click();
+  await page.getByPlaceholder(/search venues/i).fill("choa chu");
+  await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
+  await page.getByPlaceholder(/negotiable/i).fill("16");
+  await page.getByPlaceholder("9123 4567").fill(PHONE);
+  await page.getByRole("button", { name: /post court/i }).click();
+
+  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  const manageUrl = page.url().split("?")[0];
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
+
+  await page.getByRole("button", { name: /^edit$/i }).click();
+  await page.getByLabel("Phone number").fill("");
+  await page.getByLabel("Telegram handle").fill(handle);
+  await page.getByRole("button", { name: /save changes/i }).click();
+
+  // Confirm it actually persisted by browsing + revealing — Telegram now shows, no phone.
+  await page.goto("/");
+  await page.getByRole("link", { name: /choa chu kang/i }).first().click();
+  await page.getByRole("button", { name: /reveal/i }).click();
+  await expect(page.getByText(`@${handle}`)).toBeVisible();
+  await expect(page.getByRole("link", { name: /^call$/i })).toHaveCount(0);
+
+  await page.goto(manageUrl);
+  await page.getByRole("button", { name: /delete post/i }).click();
+  await expect(page).toHaveURL("/");
+});

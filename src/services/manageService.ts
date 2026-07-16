@@ -8,6 +8,8 @@ export type ManagedPost = {
     id: string; date: string; startTime: string; endTime: string;
     status: string; venueName: string;
     notes: string | null;
+    phone: string | null;
+    telegramHandle: string | null;
     priceCents?: number | null;
     pricePerPlayerCents?: number | null;
     playersNeeded?: number;
@@ -18,14 +20,14 @@ export type ManagedPost = {
 
 const LISTING_MANAGE_SELECT = {
   id: true, date: true, startTime: true, endTime: true, status: true, notes: true, priceCents: true,
-  customVenueName: true,
+  customVenueName: true, phone: true, telegramHandle: true,
   venue: { select: { name: true } },
 } as const;
 
 const SESSION_MANAGE_SELECT = {
   id: true, date: true, startTime: true, endTime: true, status: true, notes: true, pricePerPlayerCents: true,
   playersNeeded: true, skillMin: true, skillMax: true,
-  customVenueName: true,
+  customVenueName: true, phone: true, telegramHandle: true,
   venue: { select: { name: true } },
 } as const;
 
@@ -45,7 +47,7 @@ export async function findPostsByBatchToken(token: string): Promise<ManagedPost[
     post: {
       id: l.id, date: dateToStr(l.date), startTime: l.startTime, endTime: l.endTime,
       status: l.status, venueName: l.venue?.name ?? l.customVenueName ?? "Unlisted venue",
-      notes: l.notes, priceCents: l.priceCents,
+      notes: l.notes, priceCents: l.priceCents, phone: l.phone, telegramHandle: l.telegramHandle,
     },
   }));
   const sessionPosts: ManagedPost[] = sessions.map((s) => ({
@@ -53,6 +55,7 @@ export async function findPostsByBatchToken(token: string): Promise<ManagedPost[
     post: {
       id: s.id, date: dateToStr(s.date), startTime: s.startTime, endTime: s.endTime,
       status: s.status, venueName: s.venue?.name ?? s.customVenueName ?? "Unlisted venue", notes: s.notes,
+      phone: s.phone, telegramHandle: s.telegramHandle,
       pricePerPlayerCents: s.pricePerPlayerCents,
       playersNeeded: s.playersNeeded, skillMin: s.skillMin, skillMax: s.skillMax,
     },
@@ -121,6 +124,10 @@ export async function editListing(token: string, id: string, fields: EditListing
     data: {
       date: strToDate(fields.date), startTime: fields.startTime, endTime: fields.endTime,
       priceCents: fields.priceCents, notes: fields.notes,
+      // Explicit null (not undefined) when omitted: an edit fully replaces the contact,
+      // so dropping a field here means the poster meant to clear it, e.g. switching from
+      // phone to Telegram-only — undefined would leave Prisma skipping the column entirely.
+      phone: fields.phone ?? null, telegramHandle: fields.telegramHandle ?? null,
     },
   });
   return true;
@@ -134,6 +141,7 @@ export async function editSession(token: string, id: string, fields: EditSession
       date: strToDate(fields.date), startTime: fields.startTime, endTime: fields.endTime,
       pricePerPlayerCents: fields.pricePerPlayerCents, notes: fields.notes,
       playersNeeded: fields.playersNeeded, skillMin: fields.skillMin, skillMax: fields.skillMax,
+      phone: fields.phone ?? null, telegramHandle: fields.telegramHandle ?? null,
     },
   });
   return true;

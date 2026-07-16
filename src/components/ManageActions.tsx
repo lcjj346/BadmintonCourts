@@ -31,6 +31,8 @@ export function ManageActions({
   const [price, setPrice] = useState(initialCents ? String(initialCents / 100) : "");
   const [free, setFree] = useState(initialCents === 0);
   const [notes, setNotes] = useState(post.notes ?? "");
+  const [phone, setPhone] = useState(post.phone ?? "");
+  const [telegramHandle, setTelegramHandle] = useState(post.telegramHandle ?? "");
   const [playersNeeded, setPlayersNeeded] = useState(post.playersNeeded ?? 2);
   const [skillMin, setSkillMin] = useState<SkillLevel>((post.skillMin as SkillLevel) ?? "MID_INTERMEDIATE");
   const [skillMax, setSkillMax] = useState<SkillLevel>((post.skillMax as SkillLevel) ?? "MID_INTERMEDIATE");
@@ -79,14 +81,22 @@ export function ManageActions({
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
+    if (!phone.trim() && !telegramHandle.trim()) {
+      alert("Enter a phone number or a Telegram handle");
+      return;
+    }
     const cents = free ? 0 : price === "" ? null : Math.round(parseFloat(price) * 100);
     const endTime = addHoursToTime(startTime, duration);
+    const contact = {
+      phone: phone.trim() || undefined,
+      telegramHandle: telegramHandle.trim().replace(/^@/, "") || undefined,
+    };
     const body =
       type === "listing"
-        ? { action: "edit", date, startTime, endTime, priceCents: cents, notes: notes || undefined }
+        ? { action: "edit", date, startTime, endTime, priceCents: cents, notes: notes || undefined, ...contact }
         : {
             action: "edit", date, startTime, endTime, playersNeeded, skillMin, skillMax,
-            pricePerPlayerCents: cents, notes: notes || undefined,
+            pricePerPlayerCents: cents, notes: notes || undefined, ...contact,
           };
     if (await act(body)) {
       setEditing(false);
@@ -208,6 +218,27 @@ export function ManageActions({
             <input type="checkbox" checked={free} onChange={(e) => setFree(e.target.checked)} /> Free
           </label>
         </div>
+
+        <label className={label} htmlFor={`edit-phone-${post.id}`}>Phone number</label>
+        <input
+          id={`edit-phone-${post.id}`}
+          className={input}
+          type="tel"
+          placeholder="+6591234567"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value.replace(/\s/g, ""))}
+        />
+
+        <label className={label} htmlFor={`edit-telegram-${post.id}`}>Telegram handle</label>
+        <input
+          id={`edit-telegram-${post.id}`}
+          className={input}
+          type="text"
+          placeholder="@username"
+          value={telegramHandle}
+          onChange={(e) => setTelegramHandle(e.target.value.replace(/\s/g, ""))}
+        />
+        <p className="mt-1 text-xs text-gray-400">At least one of phone or Telegram is required.</p>
 
         <label className={label}>Notes</label>
         <textarea

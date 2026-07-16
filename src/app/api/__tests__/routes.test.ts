@@ -148,6 +148,7 @@ describe("listings API", () => {
       req(`http://x/api/manage/${data.batchToken}/${id}`, "PATCH", {
         type: "listing", action: "edit",
         date: tomorrow, startTime: "09:00", endTime: "11:00", priceCents: 2500, notes: "edited",
+        phone: "+6591234567",
       }),
       params({ token: data.batchToken, id }),
     );
