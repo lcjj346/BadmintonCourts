@@ -1,27 +1,28 @@
 /**
- * Seeds random courts + games for manual load testing.
+ * Seeds random courts + games for load testing (manual or automated).
  *
  * Usage (local db, uses .env):
- *   npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/loadTestSeed.ts [count]
+ *   npx ts-node scripts/loadTestSeed.ts [count]
  *
  * Usage (production db):
  *   npm run loadtest:seed:prod -- [count]
  *
  * Cleanup:
- *   npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/loadTestSeed.ts --cleanup
+ *   npx ts-node scripts/loadTestSeed.ts --cleanup
  *   npm run loadtest:cleanup:prod
  *
  * Writes go directly through Prisma, bypassing the app's rate limiter — this is for
  * load-testing the board/API/UI under realistic data volume, not for exercising the
  * rate limiter itself. Every row this script creates is tagged with notes starting
- * "[loadtest]" so --cleanup can find and remove exactly (and only) what it added.
+ * "[loadtest]" so cleanup can find and remove exactly (and only) what it added.
+ *
+ * seedLoadTest/cleanupLoadTest are also imported directly by e2e-load/load.spec.ts.
  */
 import { PrismaClient, SkillLevel } from "@prisma/client";
 import { randomUUID } from "crypto";
 
-const prisma = new PrismaClient();
+export const LOAD_TEST_TAG = "[loadtest]";
 
-const TAG = "[loadtest]";
 const SKILLS: SkillLevel[] = [
   "LOW_BEGINNER", "MID_BEGINNER", "HIGH_BEGINNER", "LOW_INTERMEDIATE",
   "MID_INTERMEDIATE", "HIGH_INTERMEDIATE", "ADVANCED",
@@ -41,13 +42,16 @@ function pick<T>(arr: T[], seed: number): T {
   return arr[seed % arr.length];
 }
 
-async function cleanup() {
-  const l = await prisma.listing.deleteMany({ where: { notes: { startsWith: TAG } } });
-  const s = await prisma.gameSession.deleteMany({ where: { notes: { startsWith: TAG } } });
-  console.log(`Removed ${l.count} load-test listings and ${s.count} load-test sessions.`);
+export async function cleanupLoadTest(prisma: PrismaClient): Promise<{ listings: number; sessions: number }> {
+  const l = await prisma.listing.deleteMany({ where: { notes: { startsWith: LOAD_TEST_TAG } } });
+  const s = await prisma.gameSession.deleteMany({ where: { notes: { startsWith: LOAD_TEST_TAG } } });
+  return { listings: l.count, sessions: s.count };
 }
 
-async function seed(count: number) {
+export async function seedLoadTest(
+  prisma: PrismaClient,
+  count: number,
+): Promise<{ listings: number; sessions: number }> {
   const venues = await prisma.venue.findMany({ select: { id: true } });
   if (venues.length === 0) throw new Error("No venues in this database — run the venue seed first");
 
@@ -63,8 +67,9 @@ async function seed(count: number) {
       startTime: `${String(hour).padStart(2, "0")}:00`,
       endTime: `${String(hour + 1 + (i % 3)).padStart(2, "0")}:00`,
       priceCents: i % 9 === 0 ? null : i % 11 === 0 ? 0 : 300 + (i % 8) * 250,
-      notes: `${TAG}${note ? " " + note : ""}`,
-      phone: `+6590${String(1000 + Math.floor(i / 5)).padStart(6, "0")}`, // ~5 per phone, under the active-post cap
+      notes: `${LOAD_TEST_TAG}${note ? " " + note : ""}`,
+      // ~5 per phone, under the active-post cap; enough distinct numbers for any count.
+      phone: `+6590${String(1000 + Math.floor(i / 5)).padStart(6, "0")}`,
       batchToken: randomUUID(),
       status: "AVAILABLE" as const,
     };
@@ -83,7 +88,7 @@ async function seed(count: number) {
       skillMin,
       skillMax: skillMin,
       pricePerPlayerCents: i % 9 === 0 ? null : i % 11 === 0 ? 0 : 200 + (i % 8) * 150,
-      notes: `${TAG}${note ? " " + note : ""}`,
+      notes: `${LOAD_TEST_TAG}${note ? " " + note : ""}`,
       phone: `+6591${String(2000 + Math.floor(i / 5)).padStart(6, "0")}`,
       batchToken: randomUUID(),
       status: "OPEN" as const,
@@ -92,14 +97,26 @@ async function seed(count: number) {
 
   await prisma.listing.createMany({ data: listingRows });
   await prisma.gameSession.createMany({ data: sessionRows });
-  console.log(`Seeded ${listingRows.length} courts and ${sessionRows.length} games (tagged "${TAG}").`);
+  return { listings: listingRows.length, sessions: sessionRows.length };
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  if (args.includes("--cleanup")) return cleanup();
-  const count = Number(args[0]) || 50;
-  return seed(count);
+  const prisma = new PrismaClient();
+  try {
+    const args = process.argv.slice(2);
+    if (args.includes("--cleanup")) {
+      const { listings, sessions } = await cleanupLoadTest(prisma);
+      console.log(`Removed ${listings} load-test listings and ${sessions} load-test sessions.`);
+      return;
+    }
+    const count = Number(args[0]) || 50;
+    const { listings, sessions } = await seedLoadTest(prisma, count);
+    console.log(`Seeded ${listings} courts and ${sessions} games (tagged "${LOAD_TEST_TAG}").`);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
-main().finally(() => prisma.$disconnect());
+if (require.main === module) {
+  main();
+}
