@@ -64,6 +64,13 @@ export default async function ManagePage({
 
       <div className="mt-4">{created ? <SaveLinkGate>{list}</SaveLinkGate> : list}</div>
 
+      <Link
+        href={`/post/${isGame ? "game" : "court"}?batchToken=${token}`}
+        className="mt-4 block w-full rounded-xl border border-dashed border-court py-2.5 text-center text-sm font-semibold text-court"
+      >
+        + Add another {isGame ? "game" : "court"}
+      </Link>
+
       <Link href="/" className="mt-4 block text-center text-sm text-gray-400">← Back to the board</Link>
     </main>
   );

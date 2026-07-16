@@ -16,8 +16,8 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
         aria-hidden
         className={`w-1.5 shrink-0 ${claimed ? "bg-gray-300" : "bg-court"}`}
       />
-      <div className="flex flex-1 items-start justify-between gap-3 py-3.5">
-        <div className="min-w-0">
+      <div className="grid flex-1 grid-cols-[1fr_auto] items-start gap-3 py-3.5">
+        <div className="min-w-0 overflow-hidden">
           <div className="truncate font-semibold leading-snug text-gray-900">
             {listing.venue.name}
           </div>
@@ -37,7 +37,7 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
             </div>
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <div className="flex flex-col items-end gap-1.5">
           <span className="whitespace-nowrap rounded-lg bg-court-light px-2.5 py-1 text-[15px] font-bold text-court">
             {formatPrice(listing.priceCents)}
           </span>

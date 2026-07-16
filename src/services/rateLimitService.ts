@@ -29,7 +29,7 @@ async function countEvents(opts: {
 }
 
 export async function assertCreateAllowed(ipHash: string): Promise<void> {
-  if ((await countEvents({ ipHash, action: "CREATE", windowMs: HOUR })) >= 5) {
+  if ((await countEvents({ ipHash, action: "CREATE", windowMs: HOUR })) >= 10) {
     throw new RateLimitError();
   }
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ok, fail, handleError } from "@/lib/api";
 import { editListingSchema, editSessionSchema } from "@/lib/schemas";
 import {
-  closePost, deletePost, updatePlayersNeeded, editListing, editSession,
+  closePost, reopenPost, deletePost, updatePlayersNeeded, editListing, editSession,
 } from "@/services/manageService";
 
 type Ctx = { params: Promise<{ token: string; id: string }> };
@@ -22,6 +22,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     if (action === "close") {
       return (await closePost(token, type.data, id)) ? ok({ closed: true }) : fail("Not found", 404);
+    }
+
+    if (action === "reopen") {
+      return (await reopenPost(token, type.data, id)) ? ok({ reopened: true }) : fail("Not found", 404);
     }
 
     if (action === "updatePlayers") {

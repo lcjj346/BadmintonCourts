@@ -93,6 +93,15 @@ export const createSessionSchema = batchEnvelope.extend({
   items: z.array(createSessionItemSchema).min(1).max(MAX_BATCH_ITEMS),
 });
 
+// --- Add-to-batch: appending more courts/games to an existing manage link. No phone —
+// the existing batch's phone is reused. ---
+export const addListingBatchItemsSchema = z.object({
+  items: z.array(createListingItemSchema).min(1).max(MAX_BATCH_ITEMS),
+});
+export const addSessionBatchItemsSchema = z.object({
+  items: z.array(createSessionItemSchema).min(1).max(MAX_BATCH_ITEMS),
+});
+
 // --- Edit: one existing court/game, from its manage page. Venue is fixed (delete + repost to change it). ---
 export const editListingSchema = itemBase
   .extend({ priceCents: z.number().int().min(0).max(50_000).nullable() })

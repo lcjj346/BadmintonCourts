@@ -87,6 +87,18 @@ export async function closePost(token: string, type: "listing" | "session", id: 
   return true;
 }
 
+/** Undoes an accidental "mark as sold/filled" click. */
+export async function reopenPost(token: string, type: "listing" | "session", id: string): Promise<boolean> {
+  if (type === "listing") {
+    if (!(await ownedListing(token, id))) return false;
+    await prisma.listing.update({ where: { id }, data: { status: "AVAILABLE" } });
+  } else {
+    if (!(await ownedSession(token, id))) return false;
+    await prisma.gameSession.update({ where: { id }, data: { status: "OPEN" } });
+  }
+  return true;
+}
+
 export async function deletePost(token: string, type: "listing" | "session", id: string): Promise<boolean> {
   if (type === "listing") {
     if (!(await ownedListing(token, id))) return false;
