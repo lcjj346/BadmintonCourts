@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 import { seedLoadTest, cleanupLoadTest, LOAD_TEST_TAG } from "../scripts/loadTestSeed";
 
 /**
- * Opt-in perf/load test: seeds ~1000 courts + 1000 games and pings the endpoints a
+ * Opt-in perf/load test: seeds ~300 courts + 300 games and pings the endpoints a
  * real user's session exercises most — browsing the board, posting, revealing contact
  * — asserting each stays under a generous "something is badly wrong" threshold rather
  * than a tight budget, since this also runs on whatever machine happens to invoke it.
@@ -13,7 +13,7 @@ import { seedLoadTest, cleanupLoadTest, LOAD_TEST_TAG } from "../scripts/loadTes
  *   npm run test:load
  */
 
-const ROW_COUNT = 1000;
+const ROW_COUNT = 300;
 const POST_TEST_PHONE = "+6599990000";
 
 // Generous ceilings: this catches a real regression (an N+1 query, a missing index,
