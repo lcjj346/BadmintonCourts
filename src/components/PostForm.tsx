@@ -86,6 +86,30 @@ export function PostForm({
     return () => clearInterval(t);
   }, []);
 
+  // A "today" entry's startTime can fall out of its own dropdown's option list —
+  // as nowTime advances past it (or a fresh entry defaults to a now-past time like
+  // "08:00") — leaving the <select>'s controlled value pointing at an <option> that
+  // no longer exists. Browsers then silently fall back to showing the first
+  // remaining option WITHOUT firing onChange, so the field visually shows a valid
+  // future time while the actual state (and therefore what gets submitted) is
+  // still the stale, already-past one. Keep state and the option list in sync so
+  // that never happens.
+  useEffect(() => {
+    if (nowTime === null) return;
+    setEntries((prev) => {
+      let changed = false;
+      const next = prev.map((e) => {
+        if (e.date !== todaySgt() || e.startTime > nowTime) return e;
+        const bumped = TIME_OPTIONS.find((t) => t > nowTime);
+        if (!bumped || bumped === e.startTime) return e;
+        changed = true;
+        return { ...e, startTime: bumped };
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nowTime, entries]);
+
   function updateEntry(key: string, patch: Partial<Entry>) {
     setEntries((prev) => prev.map((e) => (e.key === key ? { ...e, ...patch } : e)));
   }
@@ -287,6 +311,7 @@ export function PostForm({
                 <label className={label}>Start</label>
                 <select
                   className={input}
+                  aria-label="Start time"
                   value={entry.startTime}
                   disabled={noSlotsToday}
                   onChange={(e) => updateEntry(entry.key, { startTime: e.target.value })}
