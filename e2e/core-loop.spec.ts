@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import dayjs from "dayjs";
 
 const PHONE = "91234567";
@@ -24,6 +24,13 @@ async function pickDate(trigger: Locator, dateStr: string) {
     await dialog.getByRole("button", { name: "Next month" }).click();
   }
   await dialog.getByRole("button", { name: dayjs(dateStr).format("D MMMM YYYY"), exact: true }).click();
+}
+
+// Delete is a two-step flow: "Delete post" opens a confirm sheet with its own
+// "Delete" button (replaced the native confirm() dialog).
+async function deletePost(page: Page, nth = 0) {
+  await page.getByRole("button", { name: /delete post/i }).nth(nth).click();
+  await page.getByRole("dialog", { name: "Delete post?" }).getByRole("button", { name: /^delete$/i }).click();
 }
 
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {
@@ -111,15 +118,12 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await expect(page.getByText(/needs 1/i).first()).toBeVisible();
 
   // Clean up so repeated runs don't hit the per-phone active-post cap.
-  page.on("dialog", (d) => d.accept());
   await page.goto(manageUrl);
-  await page.getByRole("button", { name: /delete post/i }).click();
+  await deletePost(page);
   await expect(page).toHaveURL("/");
 });
 
 test("posts two courts in one batch under a single manage link", async ({ page }) => {
-  page.on("dialog", (d) => d.accept());
-
   await page.goto("/post/court");
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
@@ -154,15 +158,13 @@ test("posts two courts in one batch under a single manage link", async ({ page }
   // Deleting the first (of two) refreshes back to the manage page with one left;
   // deleting the last returns to the board.
   await page.goto(manageUrl);
-  await page.getByRole("button", { name: /delete post/i }).first().click();
+  await deletePost(page);
   await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1);
-  await page.getByRole("button", { name: /delete post/i }).first().click();
+  await deletePost(page);
   await expect(page).toHaveURL("/");
 });
 
 test("can't reach 'add another' before saving the manage link, and adding one re-gates it", async ({ page }) => {
-  page.on("dialog", (d) => d.accept());
-
   await page.goto("/post/court");
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
@@ -199,14 +201,13 @@ test("can't reach 'add another' before saving the manage link, and adding one re
   await expect(page.getByText("$20")).toBeVisible();
 
   // Clean up so repeated runs don't hit the per-phone active-post cap.
-  await page.getByRole("button", { name: /delete post/i }).first().click();
+  await deletePost(page);
   await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1);
-  await page.getByRole("button", { name: /delete post/i }).first().click();
+  await deletePost(page);
   await expect(page).toHaveURL("/");
 });
 
 test("posts at a venue not in the list, and it shows up filtered by region", async ({ page }) => {
-  page.on("dialog", (d) => d.accept());
   const venueName = `Test Private Hall ${Date.now()}`;
 
   await page.goto("/post/court");
@@ -228,12 +229,11 @@ test("posts at a venue not in the list, and it shows up filtered by region", asy
   await expect(page.getByText(venueName)).toBeVisible();
 
   await page.goto(manageUrl);
-  await page.getByRole("button", { name: /delete post/i }).click();
+  await deletePost(page);
   await expect(page).toHaveURL("/");
 });
 
 test("posts with only a Telegram handle (no phone), reveals a Telegram link, and a Maps link works", async ({ page }) => {
-  page.on("dialog", (d) => d.accept());
   const handle = `test_user_${Date.now()}`;
 
   await page.goto("/post/court");
@@ -261,12 +261,11 @@ test("posts with only a Telegram handle (no phone), reveals a Telegram link, and
   await expect(page.getByRole("link", { name: /^call$/i })).toHaveCount(0);
 
   await page.goto(manageUrl);
-  await page.getByRole("button", { name: /delete post/i }).click();
+  await deletePost(page);
   await expect(page).toHaveURL("/");
 });
 
 test("editing a post can switch its contact from phone to Telegram", async ({ page }) => {
-  page.on("dialog", (d) => d.accept());
   const handle = `edited_user_${Date.now()}`;
 
   await page.goto("/post/court");
@@ -295,6 +294,6 @@ test("editing a post can switch its contact from phone to Telegram", async ({ pa
   await expect(page.getByRole("link", { name: /^call$/i })).toHaveCount(0);
 
   await page.goto(manageUrl);
-  await page.getByRole("button", { name: /delete post/i }).click();
+  await deletePost(page);
   await expect(page).toHaveURL("/");
 });

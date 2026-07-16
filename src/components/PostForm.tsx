@@ -48,8 +48,8 @@ function makeEntry(key: string): Entry {
     free: false,
     notes: "",
     playersNeeded: 2,
-    skillMin: "MID_INTERMEDIATE",
-    skillMax: "MID_INTERMEDIATE",
+    skillMin: "MID_BEGINNER",
+    skillMax: "HIGH_BEGINNER",
   };
 }
 

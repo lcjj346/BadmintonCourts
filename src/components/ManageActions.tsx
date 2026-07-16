@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BottomSheet } from "@/components/BottomSheet";
 import { DateField } from "@/components/DateField";
 import { todaySgt, maxPostDateSgt, TIME_OPTIONS, addHoursToTime } from "@/lib/time";
 import { SKILL_OPTIONS, SKILL_ORDER, PLAYER_COUNT_OPTIONS, type SkillLevel } from "@/lib/skill";
@@ -24,6 +25,14 @@ export function ManageActions({
   const expired = post.status === "EXPIRED";
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const [date, setDate] = useState(post.date);
   const [startTime, setStartTime] = useState(post.startTime);
@@ -52,12 +61,12 @@ export function ManageActions({
       });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
-        alert(json?.error ?? "Something went wrong — try again");
+        setToast(json?.error ?? "Something went wrong — try again");
         return false;
       }
       return true;
     } catch {
-      alert("Network error — try again");
+      setToast("Network error — try again");
       return false;
     } finally {
       setBusy(false);
@@ -73,7 +82,7 @@ export function ManageActions({
   }
 
   async function remove() {
-    if (!confirm("Delete this post permanently?")) return;
+    setConfirmDelete(false);
     if (!(await act({}, "DELETE"))) return;
     // Deleting the last post in the batch leaves nothing to manage — back to the board.
     if (postCount <= 1) router.push("/");
@@ -83,7 +92,7 @@ export function ManageActions({
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!phone.trim() && !telegramHandle.trim()) {
-      alert("Enter a phone number or a Telegram handle");
+      setToast("Enter a phone number or a Telegram handle");
       return;
     }
     const cents = free ? 0 : price === "" ? null : Math.round(parseFloat(price) * 100);
@@ -108,8 +117,19 @@ export function ManageActions({
   const label = "block text-xs font-semibold mt-3 mb-1";
   const input = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white";
 
+  const toastNode = toast && (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-x-4 bottom-6 z-[60] mx-auto max-w-md rounded-xl bg-gray-900 px-4 py-3 text-center text-sm font-medium text-white shadow-lg"
+    >
+      {toast}
+    </div>
+  );
+
   if (editing) {
     return (
+      <>
       <form onSubmit={saveEdit} className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
         <label className={label} htmlFor={`edit-date-${post.id}`}>Date</label>
         <DateField
@@ -260,6 +280,8 @@ export function ManageActions({
           </button>
         </div>
       </form>
+      {toastNode}
+      </>
     );
   }
 
@@ -293,12 +315,33 @@ export function ManageActions({
         </button>
       )}
       <button
-        onClick={remove}
+        onClick={() => setConfirmDelete(true)}
         disabled={busy}
         className="w-full rounded-xl border border-red-300 py-2.5 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
       >
         Delete post
       </button>
+
+      <BottomSheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete post?">
+        <p className="text-sm text-gray-600">This can&apos;t be undone.</p>
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={remove}
+            disabled={busy}
+            className="flex-1 rounded-xl bg-red-600 py-2.5 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+          >
+            Delete
+          </button>
+          <button
+            onClick={() => setConfirmDelete(false)}
+            className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </BottomSheet>
+
+      {toastNode}
     </div>
   );
 }
