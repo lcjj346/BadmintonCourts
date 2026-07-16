@@ -1,4 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
+import { loadEnvConfig } from "@next/env";
+
+// `next start` (production mode, used for CI below) resolves .env.production.local
+// ahead of .env if that file exists — which it does on a machine also used for the
+// prod:migrate/prod:seed scripts, and it points at the REAL production database.
+// Forcing dev=true here reproduces `next dev`'s precedence (.env.local/.env win),
+// so e2e traffic can never end up hitting production no matter what other .env
+// files exist locally. In actual CI there's no local .env file at all — only the
+// workflow's own already-correct env: block — so DATABASE_URL/DIRECT_URL below are
+// undefined there and this override is skipped entirely.
+const { combinedEnv } = loadEnvConfig(__dirname, true);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -23,5 +34,13 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    ...(typeof combinedEnv.DATABASE_URL === "string"
+      ? {
+          env: {
+            DATABASE_URL: combinedEnv.DATABASE_URL,
+            DIRECT_URL: typeof combinedEnv.DIRECT_URL === "string" ? combinedEnv.DIRECT_URL : combinedEnv.DATABASE_URL,
+          },
+        }
+      : {}),
   },
 });
