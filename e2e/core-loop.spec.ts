@@ -33,11 +33,19 @@ async function deletePost(page: Page, nth = 0) {
   await page.getByRole("dialog", { name: "Delete post?" }).getByRole("button", { name: /^delete$/i }).click();
 }
 
+// Captured per-page in a beforeEach below — an uncaught exception thrown
+// synchronously inside submit() (e.g. while building the request body, before
+// its try/catch) would leave the button stuck on "Posting…" forever with no
+// visible error text at all, which a DOM-only diagnostic can't distinguish
+// from, say, the click just not registering. Console/pageerror capture can.
+const pageErrors = new WeakMap<Page, string[]>();
+
 // Waits for the post-submit redirect to the manage page. A plain toHaveURL
 // timeout gives no clue *why* the app didn't navigate (validation error?
-// server rejection? network failure?) — this dumps whatever error text was
-// left on the page directly into the failure message, so a CI-only failure
-// is diagnosable straight from the log instead of needing the HTML report.
+// server rejection? network failure? uncaught exception?) — this dumps
+// whatever error text, JS errors, and submit-button state were left on the
+// page directly into the failure message, so a CI-only failure is
+// diagnosable straight from the log instead of needing the HTML report.
 async function expectManageRedirect(page: Page, pattern: RegExp | string = /\/manage\/[0-9a-f-]{36}\?created=1/) {
   const ok = await page
     .waitForURL(pattern, { timeout: 10_000 })
@@ -45,12 +53,29 @@ async function expectManageRedirect(page: Page, pattern: RegExp | string = /\/ma
     .catch(() => false);
   if (!ok) {
     const errors = await page.locator(".text-red-600").allTextContents();
+    const jsErrors = pageErrors.get(page) ?? [];
+    const submitButtonText = await page
+      .locator('form button[type="submit"]')
+      .first()
+      .textContent()
+      .catch(() => null);
     throw new Error(
       `Expected navigation matching ${pattern} but the page stayed at ${page.url()}. ` +
-        `Visible error text on page: ${JSON.stringify(errors)}`,
+        `Visible error text on page: ${JSON.stringify(errors)}. ` +
+        `Submit button text: ${JSON.stringify(submitButtonText)}. ` +
+        `Browser console/page errors: ${JSON.stringify(jsErrors)}`,
     );
   }
 }
+
+test.beforeEach(({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(`console.error: ${msg.text()}`);
+  });
+  pageErrors.set(page, errors);
+});
 
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {
   // Post a court listing.
