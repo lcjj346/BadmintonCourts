@@ -144,3 +144,48 @@ test("posts two courts in one batch under a single manage link", async ({ page }
   await page.getByRole("button", { name: /delete post/i }).first().click();
   await expect(page).toHaveURL("/");
 });
+
+test("can't reach 'add another' before saving the manage link, and adding one re-gates it", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+
+  await page.goto("/post/court");
+  await page.getByRole("button", { name: /choose a venue/i }).click();
+  await page.getByPlaceholder(/search venues/i).fill("choa chu");
+  await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
+  await page.getByPlaceholder(/negotiable/i).fill("16");
+  await page.getByPlaceholder("9123 4567").fill(PHONE);
+  await page.getByRole("button", { name: /post court/i }).click();
+
+  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  const manageUrl = page.url().split("?")[0];
+
+  // Before copying the link, "+ Add another court" must not be reachable — otherwise a
+  // poster who skips the copy step and adds more right away permanently loses the link.
+  await expect(page.getByText(/copy your manage link before continuing/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /add another court/i })).not.toBeVisible();
+
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
+  await page.getByRole("link", { name: /add another court/i }).click();
+
+  await page.getByRole("button", { name: /choose a venue/i }).click();
+  await page.getByPlaceholder(/search venues/i).fill("choa chu");
+  await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
+  await page.getByPlaceholder(/negotiable/i).fill("20");
+  await page.getByRole("button", { name: /^add court$/i }).click();
+
+  // Landing back on the same manage link, the save-link gate fires again — a second
+  // safety net even for a poster who already copied it once.
+  await expect(page).toHaveURL(`${manageUrl}?created=1`);
+  await expect(page.getByText(/copy your manage link before continuing/i)).toBeVisible();
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
+  await expect(page.getByText("$16")).toBeVisible();
+  await expect(page.getByText("$20")).toBeVisible();
+
+  // Clean up so repeated runs don't hit the per-phone active-post cap.
+  await page.getByRole("button", { name: /delete post/i }).first().click();
+  await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1);
+  await page.getByRole("button", { name: /delete post/i }).first().click();
+  await expect(page).toHaveURL("/");
+});

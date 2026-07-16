@@ -137,7 +137,10 @@ export function PostForm({
         setSubmitting(false);
         return setError(json.error ?? "Something went wrong");
       }
-      router.push(batchToken ? `/manage/${batchToken}` : `/manage/${json.data.batchToken}?created=1`);
+      // created=1 re-triggers the "copy your manage link" gate even on an append — if the
+      // poster skipped straight to "+ Add another" without ever copying the original link,
+      // this is the only remaining chance to force them to save it.
+      router.push(`/manage/${batchToken ?? json.data.batchToken}?created=1`);
     } catch {
       setSubmitting(false);
       setError("Network error — please try again");
