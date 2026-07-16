@@ -20,6 +20,11 @@ export default defineConfig({
   // retries absorbs that without masking a genuinely broken test, which would
   // still fail all three attempts. Local runs stay retry-free for fast feedback.
   retries: process.env.CI ? 2 : 0,
+  // Without this, no playwright-report/ directory is ever produced — the "html"
+  // reporter isn't on by default — so ci.yml's "Upload Playwright report on
+  // failure" step had nothing to actually upload. "list" keeps normal terminal
+  // output; "html" (never auto-opened) is what makes that upload step useful.
+  reporter: [["list"], ["html", { open: "never" }]],
   use: { baseURL: "http://localhost:3000" },
   projects: [
     { name: "mobile-chrome", use: { ...devices["Pixel 7"], permissions: ["clipboard-write"] } },
