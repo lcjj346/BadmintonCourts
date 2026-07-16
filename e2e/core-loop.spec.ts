@@ -1,5 +1,10 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import dayjs from "dayjs";
+import { loadEnvConfig } from "@next/env";
+import { PrismaClient } from "@prisma/client";
+
+loadEnvConfig(process.cwd());
+const prisma = new PrismaClient();
 
 const PHONE = "91234567";
 
@@ -68,13 +73,33 @@ async function expectManageRedirect(page: Page, pattern: RegExp | string = /\/ma
   }
 }
 
-test.beforeEach(({ page }) => {
+// Retries re-run a whole test from scratch, but a *failed* attempt never
+// reaches its own cleanup code — so its created listing/session and its
+// create/reveal rate-limit events stick around into the next attempt (and
+// into later, unrelated tests). That cascades badly: a stray "Choa Chu Kang"
+// listing left behind makes `.first()` venue lookups in other tests grab the
+// wrong post, and leftover rate-limit events from repeated retries can push
+// the whole run's shared IP over the real per-hour create/reveal caps,
+// failing tests that would otherwise pass cleanly. Wiping both before every
+// single attempt (not just once for the whole run, like global-setup.ts
+// does) gives each attempt — first try or retry — a guaranteed-clean slate.
+test.beforeEach(async ({ page }) => {
+  await Promise.all([
+    prisma.listing.deleteMany({}),
+    prisma.gameSession.deleteMany({}),
+    prisma.rateLimitEvent.deleteMany({}),
+  ]);
+
   const errors: string[] = [];
   page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`));
   page.on("console", (msg) => {
     if (msg.type() === "error") errors.push(`console.error: ${msg.text()}`);
   });
   pageErrors.set(page, errors);
+});
+
+test.afterAll(async () => {
+  await prisma.$disconnect();
 });
 
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {

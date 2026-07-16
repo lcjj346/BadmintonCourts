@@ -107,7 +107,6 @@ export function PostForm({
       });
       return changed ? next : prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowTime, entries]);
 
   function updateEntry(key: string, patch: Partial<Entry>) {
