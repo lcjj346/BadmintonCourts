@@ -74,12 +74,13 @@ model Listing {
   notes      String?
   phone      String?                      // nullable: scrubbed post-expiry (§7). NEVER in public selects
   status     ListingStatus @default(AVAILABLE)
-  editToken  String        @unique @default(uuid())
+  batchToken String        @default(uuid())  // shared by every post created in the same submission — the manage-link secret
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
   @@index([date, status])
   @@index([venueId])
+  @@index([batchToken])
 }
 
 model GameSession {
@@ -96,12 +97,13 @@ model GameSession {
   notes               String?
   phone               String?             // same scrubbing + select rules as Listing
   status              SessionStatus @default(OPEN)
-  editToken           String        @unique @default(uuid())
+  batchToken          String        @default(uuid())  // shared by every post created in the same submission — the manage-link secret
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
   @@index([date, status])
   @@index([venueId])
+  @@index([batchToken])
 }
 
 model RateLimitEvent {

@@ -48,17 +48,19 @@ test("court: post → browse → detail → reveal → mark sold", async ({ page
     `https://wa.me/65${PHONE}`,
   );
 
-  // Manage: mark sold.
+  // Manage: mark sold. Exact match — "SOLD" is a case-insensitive substring of the
+  // "Mark as sold" button's own label, so a loose match here would false-positive
+  // even if the close request never actually persisted.
   await page.goto(manageUrl);
   await page.getByRole("button", { name: /mark as sold/i }).click();
-  await expect(page.getByText("SOLD").first()).toBeVisible();
+  await expect(page.getByText("SOLD", { exact: true }).first()).toBeVisible();
 
   // Board reflects the SOLD badge. Re-navigate on each retry (not just poll the
   // DOM) so a stale prefetched/cached board render can't satisfy — or defeat —
   // the assertion; the server render is authoritative and shows SOLD.
   await expect(async () => {
     await page.goto(`/?t=${Date.now()}`, { waitUntil: "networkidle" });
-    await expect(page.getByText("SOLD").first()).toBeVisible();
+    await expect(page.getByText("SOLD", { exact: true }).first()).toBeVisible();
   }).toPass({ timeout: 20_000 });
 });
 
@@ -78,10 +80,11 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   // Manage actions are gated behind the "copy my manage link" click.
   await page.getByRole("button", { name: /copy my manage link/i }).click();
 
-  // Poster edits "Players still needed" from the manage link → 1, and it sticks after refresh.
-  await page.getByLabel("Players still needed").selectOption("1");
-  await page.getByRole("button", { name: /^update$/i }).click();
-  await expect(page.getByLabel("Players still needed")).toHaveValue("1");
+  // Poster edits "Players needed" via the Edit form → 1, and it sticks after refresh.
+  await page.getByRole("button", { name: /^edit$/i }).click();
+  await page.getByLabel("Edit players needed").selectOption("1");
+  await page.getByRole("button", { name: /save changes/i }).click();
+  await expect(page.getByText(/needs 1/i).first()).toBeVisible();
 
   // Players board shows the open game with the updated count ("Needs 1").
   await page.goto("/?tab=players");
@@ -96,5 +99,48 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   page.on("dialog", (d) => d.accept());
   await page.goto(manageUrl);
   await page.getByRole("button", { name: /delete post/i }).click();
+  await expect(page).toHaveURL("/");
+});
+
+test("posts two courts in one batch under a single manage link", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+
+  await page.goto("/post/court");
+  await page.getByRole("button", { name: /choose a venue/i }).click();
+  await page.getByPlaceholder(/search venues/i).fill("choa chu");
+  await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
+  await page.getByPlaceholder(/negotiable/i).fill("16");
+
+  await page.getByRole("button", { name: /add another court/i }).click();
+  await expect(page.getByText("Court 2")).toBeVisible();
+  // Court 1's venue button now reads "Choa Chu Kang Sport Hall", so only Court 2's
+  // button still matches "Choose a venue…".
+  await page.getByRole("button", { name: /choose a venue/i }).click();
+  const sheet = page.getByRole("dialog", { name: "Venue" });
+  await sheet.getByPlaceholder(/search venues/i).fill("choa chu");
+  await sheet.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").nth(1).fill(tomorrowSgt());
+  await page.getByPlaceholder(/negotiable/i).nth(1).fill("20");
+
+  await page.getByPlaceholder("9123 4567").fill(PHONE);
+  await page.getByRole("button", { name: /post 2 courts/i }).click();
+
+  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  const manageUrl = page.url().split("?")[0];
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
+
+  // Both courts are listed under the same link.
+  await expect(page.getByText("$16")).toBeVisible();
+  await expect(page.getByText("$20")).toBeVisible();
+  await expect(page.getByRole("button", { name: /mark as sold/i })).toHaveCount(2);
+
+  // Clean up: delete both so repeated runs don't hit the per-phone active-post cap.
+  // Deleting the first (of two) refreshes back to the manage page with one left;
+  // deleting the last returns to the board.
+  await page.goto(manageUrl);
+  await page.getByRole("button", { name: /delete post/i }).first().click();
+  await expect(page.getByRole("button", { name: /delete post/i })).toHaveCount(1);
+  await page.getByRole("button", { name: /delete post/i }).first().click();
   await expect(page).toHaveURL("/");
 });

@@ -1,80 +1,125 @@
 import { prisma } from "@/lib/db";
-import { dateToStr } from "@/lib/time";
+import { dateToStr, strToDate } from "@/lib/time";
+import type { EditListingInput, EditSessionInput } from "@/lib/schemas";
 
 export type ManagedPost = {
   type: "listing" | "session";
   post: {
     id: string; date: string; startTime: string; endTime: string;
-    status: string; venueName: string; playersNeeded?: number;
+    status: string; venueName: string;
+    notes: string | null;
+    priceCents?: number | null;
+    pricePerPlayerCents?: number | null;
+    playersNeeded?: number;
+    skillMin?: string;
+    skillMax?: string;
   };
 };
 
-const MANAGE_SELECT = {
-  id: true, date: true, startTime: true, endTime: true, status: true,
+const LISTING_MANAGE_SELECT = {
+  id: true, date: true, startTime: true, endTime: true, status: true, notes: true, priceCents: true,
   venue: { select: { name: true } },
 } as const;
 
 const SESSION_MANAGE_SELECT = {
-  ...MANAGE_SELECT, playersNeeded: true,
+  id: true, date: true, startTime: true, endTime: true, status: true, notes: true, pricePerPlayerCents: true,
+  playersNeeded: true, skillMin: true, skillMax: true,
+  venue: { select: { name: true } },
 } as const;
 
-export async function findPostByToken(token: string): Promise<ManagedPost | null> {
-  const listing = await prisma.listing.findUnique({
-    where: { editToken: token }, select: MANAGE_SELECT,
-  });
-  if (listing) {
-    return {
-      type: "listing",
-      post: {
-        id: listing.id, date: dateToStr(listing.date),
-        startTime: listing.startTime, endTime: listing.endTime,
-        status: listing.status, venueName: listing.venue.name,
-      },
-    };
-  }
-  const session = await prisma.gameSession.findUnique({
-    where: { editToken: token }, select: SESSION_MANAGE_SELECT,
-  });
-  if (session) {
-    return {
-      type: "session",
-      post: {
-        id: session.id, date: dateToStr(session.date),
-        startTime: session.startTime, endTime: session.endTime,
-        status: session.status, venueName: session.venue.name,
-        playersNeeded: session.playersNeeded,
-      },
-    };
-  }
-  return null;
+/** Everything created under one manage link — the whole batch, both kinds. */
+export async function findPostsByBatchToken(token: string): Promise<ManagedPost[]> {
+  const [listings, sessions] = await Promise.all([
+    prisma.listing.findMany({
+      where: { batchToken: token }, select: LISTING_MANAGE_SELECT, orderBy: { createdAt: "asc" },
+    }),
+    prisma.gameSession.findMany({
+      where: { batchToken: token }, select: SESSION_MANAGE_SELECT, orderBy: { createdAt: "asc" },
+    }),
+  ]);
+
+  const listingPosts: ManagedPost[] = listings.map((l) => ({
+    type: "listing",
+    post: {
+      id: l.id, date: dateToStr(l.date), startTime: l.startTime, endTime: l.endTime,
+      status: l.status, venueName: l.venue.name, notes: l.notes, priceCents: l.priceCents,
+    },
+  }));
+  const sessionPosts: ManagedPost[] = sessions.map((s) => ({
+    type: "session",
+    post: {
+      id: s.id, date: dateToStr(s.date), startTime: s.startTime, endTime: s.endTime,
+      status: s.status, venueName: s.venue.name, notes: s.notes,
+      pricePerPlayerCents: s.pricePerPlayerCents,
+      playersNeeded: s.playersNeeded, skillMin: s.skillMin, skillMax: s.skillMax,
+    },
+  }));
+
+  return [...listingPosts, ...sessionPosts].sort((a, b) =>
+    a.post.date === b.post.date
+      ? a.post.startTime.localeCompare(b.post.startTime)
+      : a.post.date.localeCompare(b.post.date),
+  );
 }
 
-// Session posts only. Returns false for an unknown token or a listing-type post.
-export async function updatePlayersNeeded(token: string, playersNeeded: number): Promise<boolean> {
-  const found = await findPostByToken(token);
-  if (!found || found.type !== "session") return false;
-  await prisma.gameSession.update({ where: { editToken: token }, data: { playersNeeded } });
+/** Confirms `id` both exists and belongs to this manage link before any write. */
+async function ownedListing(token: string, id: string) {
+  return prisma.listing.findFirst({ where: { id, batchToken: token }, select: { id: true } });
+}
+async function ownedSession(token: string, id: string) {
+  return prisma.gameSession.findFirst({ where: { id, batchToken: token }, select: { id: true } });
+}
+
+export async function updatePlayersNeeded(token: string, id: string, playersNeeded: number): Promise<boolean> {
+  if (!(await ownedSession(token, id))) return false;
+  await prisma.gameSession.update({ where: { id }, data: { playersNeeded } });
   return true;
 }
 
-export async function closePostByToken(token: string): Promise<boolean> {
-  const found = await findPostByToken(token);
-  if (!found) return false;
-  if (found.type === "listing") {
-    await prisma.listing.update({ where: { editToken: token }, data: { status: "SOLD" } });
+export async function closePost(token: string, type: "listing" | "session", id: string): Promise<boolean> {
+  if (type === "listing") {
+    if (!(await ownedListing(token, id))) return false;
+    await prisma.listing.update({ where: { id }, data: { status: "SOLD" } });
   } else {
-    await prisma.gameSession.update({ where: { editToken: token }, data: { status: "FILLED" } });
+    if (!(await ownedSession(token, id))) return false;
+    await prisma.gameSession.update({ where: { id }, data: { status: "FILLED" } });
   }
   return true;
 }
 
-export async function deletePostByToken(token: string): Promise<boolean> {
-  const found = await findPostByToken(token);
-  if (!found) return false;
-  if (found.type === "listing") {
-    await prisma.listing.delete({ where: { editToken: token } });
+export async function deletePost(token: string, type: "listing" | "session", id: string): Promise<boolean> {
+  if (type === "listing") {
+    if (!(await ownedListing(token, id))) return false;
+    await prisma.listing.delete({ where: { id } });
   } else {
-    await prisma.gameSession.delete({ where: { editToken: token } });
+    if (!(await ownedSession(token, id))) return false;
+    await prisma.gameSession.delete({ where: { id } });
   }
+  return true;
+}
+
+/** Venue is fixed — changing it means deleting and reposting. */
+export async function editListing(token: string, id: string, fields: EditListingInput): Promise<boolean> {
+  if (!(await ownedListing(token, id))) return false;
+  await prisma.listing.update({
+    where: { id },
+    data: {
+      date: strToDate(fields.date), startTime: fields.startTime, endTime: fields.endTime,
+      priceCents: fields.priceCents, notes: fields.notes,
+    },
+  });
+  return true;
+}
+
+export async function editSession(token: string, id: string, fields: EditSessionInput): Promise<boolean> {
+  if (!(await ownedSession(token, id))) return false;
+  await prisma.gameSession.update({
+    where: { id },
+    data: {
+      date: strToDate(fields.date), startTime: fields.startTime, endTime: fields.endTime,
+      pricePerPlayerCents: fields.pricePerPlayerCents, notes: fields.notes,
+      playersNeeded: fields.playersNeeded, skillMin: fields.skillMin, skillMax: fields.skillMax,
+    },
+  });
   return true;
 }

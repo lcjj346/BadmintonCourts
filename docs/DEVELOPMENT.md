@@ -15,7 +15,7 @@ the tech stack, architecture, local development, deployment, and testing.
 | ORM / DB | **Prisma 6 + PostgreSQL** (Neon) | Typed queries, migrations; Postgres-backed rate limiting (no Redis) |
 | Validation | **Zod** | One schema layer for API input **and** environment variables |
 | Dates/time | **dayjs** (utc + timezone) | Confined to `src/lib/time.ts`; all court times are SGT wall-clock |
-| Logging | **Pino** | JSON logs to stdout with `phone`/`editToken`/`url` redaction |
+| Logging | **Pino** | JSON logs to stdout with `phone`/`batchToken`/`url` redaction |
 | Tests | **Jest + React Testing Library + Playwright** | Unit + component + one end-to-end core-loop |
 | Analytics | **Vercel Analytics** | Free, privacy-light traffic measurement |
 | Hosting | **Vercel + Neon** | Both free tiers cover ~1,000 users/day at $0/mo; Neon auto-wakes on query, no manual resume |
@@ -33,7 +33,7 @@ flowchart LR
         ZOD["Zod<br/>input + env validation"]
     end
     subgraph quality ["Quality"]
-        JEST["Jest + RTL<br/>93 tests"]
+        JEST["Jest + RTL<br/>112 tests"]
         PW["Playwright<br/>core-loop E2E"]
         TSC["tsc --noEmit<br/>required gate"]
     end
@@ -72,7 +72,7 @@ flowchart TD
     B -->|"page navigation"| SC
     B -->|"fetch() — post, reveal, report"| RH
     RH --> ZOD --> SVC
-    SC -->|"reads via PUBLIC_SELECT<br/>(phone + editToken omitted)"| SVC
+    SC -->|"reads via PUBLIC_SELECT<br/>(phone + batchToken omitted)"| SVC
     SVC --> PC
     PC -->|"pooled connection (Neon pooler)"| DB
 
@@ -83,7 +83,7 @@ flowchart TD
 Two structural guarantees fall out of this shape:
 
 - **Phone containment** — pages and list APIs can only read through `PUBLIC_*_SELECT`
-  projections that omit `phone`/`editToken`, so a scraper can't find a number anywhere
+  projections that omit `phone`/`batchToken`, so a scraper can't find a number anywhere
   except the rate-limited reveal endpoint.
 - **Testability** — every service is a plain async function against Postgres, tested
   directly without HTTP.
@@ -96,10 +96,10 @@ src/
     page.tsx                 Board homepage (Courts | Players tabs, date strip, filters)
     listing/[id]/page.tsx    Court detail + click-to-reveal
     session/[id]/page.tsx    Game detail + click-to-reveal
-    post/                    Chooser + court form + game form
-    manage/[token]/page.tsx  Secret manage page (mark sold/filled, delete) — doubles as success page
+    post/                    Chooser + court form + game form (repeatable entries, one manage link)
+    manage/[token]/page.tsx  Secret manage page — lists every post in the batch (edit, mark sold/filled, delete)
     venue-request/page.tsx   "Request a venue" form
-    api/                     11 route handlers (listings, sessions, manage, venues, suggestions)
+    api/                     13 route handlers (listings, sessions, manage, venues, suggestions)
   components/                Cards, BottomSheet, DateStrip, FilterBar, VenuePicker, RevealButton, …
   services/                  All Prisma queries live here
   lib/
@@ -123,7 +123,8 @@ e2e/                         Playwright core-loop happy path
   (SPORTS_HALL/COMMUNITY_CENTRE/SCHOOL/OTHER), optional availabilityNote (e.g. schools:
   "Weekends & school holidays only").
 - **Listing** (a court for sale) — venue, date, start/end time, priceCents (`0`=free,
-  `null`=negotiable), notes, **phone**, status (AVAILABLE/SOLD/EXPIRED), unique **editToken**.
+  `null`=negotiable), notes, **phone**, status (AVAILABLE/SOLD/EXPIRED), and a **batchToken**
+  (not unique — every post created in the same submission shares one, which is the manage link).
 - **GameSession** (a game seeking players) — like Listing plus playersNeeded, skillMin/skillMax
   (a skill-level range), pricePerPlayerCents; status OPEN/FILLED/EXPIRED.
 - **RateLimitEvent** — hashed IP + action + optional target, for Postgres-backed rate limiting.
@@ -139,17 +140,17 @@ sequenceDiagram
     participant App as Next.js on Vercel
     participant DB as Postgres on Neon
 
-    Note over S,DB: 1 · Post a court slot
-    S->>App: POST /api/listings — venue, date, time, price, phone
-    App->>App: Zod validate · honeypot check · rate limit by hashed IP
-    App->>DB: create Listing
-    DB-->>App: secret editToken
+    Note over S,DB: 1 · Post one or more court slots
+    S->>App: POST /api/listings — items[], phone
+    App->>App: Zod validate each item · honeypot check · rate limit by hashed IP
+    App->>DB: create every Listing in one transaction, sharing one batchToken
+    DB-->>App: secret batchToken + ids
     App-->>S: redirect to /manage/token?created=1 — gated behind "copy my manage link"
 
     Note over S,DB: 2 · Browse (phone never sent)
     B->>App: GET / — date strip + region/venue/time filters
     App->>DB: sweep expired posts, then query via PUBLIC_SELECT
-    DB-->>App: listings WITHOUT phone or editToken
+    DB-->>App: listings WITHOUT phone or batchToken
     App-->>B: board HTML — number not present anywhere
 
     Note over S,DB: 3 · Reveal (the only phone path)
@@ -160,28 +161,32 @@ sequenceDiagram
     B->>S: deal happens off-platform
 
     Note over S,DB: 4 · Close
-    S->>App: PATCH /manage/token — mark as sold
-    App->>DB: status = SOLD (stays on board, badged, until date passes)
+    S->>App: PATCH /manage/token/id — mark this one post as sold
+    App->>DB: verify id belongs to token, then status = SOLD (stays on board, badged, until date passes)
 ```
 
-1. **Post** — seller fills the court form → `POST /api/listings`. Zod validates (phone,
-   date within today→+8 weeks, honeypot empty). The route rate-limits by hashed IP, then
-   `listingService.createListing` writes the row and returns a secret `editToken`.
-2. **Success = manage link** — the browser lands on `/manage/<editToken>?created=1`, which
-   gates the mark-sold/delete controls behind an explicit "copy my manage link" click — that
-   URL is the *only* way to edit the post (no login), so the click forces the poster to save
-   it before they can do anything else.
+1. **Post** — a seller fills the court form, optionally adding several courts with
+   "+ Add another court", then submits once → `POST /api/listings` with an `items[]` array.
+   Zod validates every item (date within today→+8 weeks, honeypot empty). The route
+   rate-limits by hashed IP once per request, then `listingService.createListingBatch` writes
+   all rows in one transaction, sharing a single secret `batchToken`.
+2. **Success = manage link** — the browser lands on `/manage/<batchToken>?created=1`, which
+   gates the mark-sold/edit/delete controls behind an explicit "copy my manage link" click —
+   that URL is the *only* way to manage any post in the batch (no login), so the click forces
+   the poster to save it before they can do anything else.
 3. **Browse** — a buyer opens `/` (server component). `listingService.listListings` runs an
    on-read sweep (expire past posts, scrub old phones), then returns rows via
-   `PUBLIC_LISTING_SELECT` — a select that **structurally omits `phone` and `editToken`**, so
+   `PUBLIC_LISTING_SELECT` — a select that **structurally omits `phone` and `batchToken`**, so
    the number never reaches the browser.
 4. **Reveal** — on the detail page the buyer taps "Reveal contact" → `POST
    /api/listings/[id]/reveal`. This endpoint is rate-limited (per IP+listing and globally) and
    is the *only* path that returns a phone number. The UI shows it with `tel:` and WhatsApp
    deep links.
-5. **Close** — the seller opens their manage link and taps "Mark as sold" (`PATCH`) or
-   "Delete" (`DELETE`). Sold posts stay on the board (badged, sorted last) until their date
-   passes, then auto-expire.
+5. **Manage** — the seller opens their manage link, which lists every post in the batch. Each
+   one has its own Edit (date/time/price/notes, and for games, players needed/skill range),
+   "Mark as sold/filled" (`PATCH /api/manage/[token]/[id]`), and Delete (`DELETE`) — every
+   write re-checks that `id` actually belongs to `token` before touching the row. Sold/filled
+   posts stay on the board (badged, sorted last) until their date passes, then auto-expire.
 
 ### Time handling
 
@@ -320,7 +325,7 @@ compute after a few minutes of inactivity and wakes itself on the next query —
 ## Testing
 
 - **Jest unit** (`src/**/__tests__`) — services (expiry sweep, rate-limit windows, the
-  `phone`/`editToken` omission from public selects), `lib/time.ts` SGT boundaries, Zod schemas.
+  `phone`/`batchToken` omission from public selects), `lib/time.ts` SGT boundaries, Zod schemas.
   Service tests hit the local Postgres and run serially (`--runInBand`).
 - **React Testing Library** — cards, bottom sheet, date strip, venue picker, reveal button.
 - **Playwright** (`e2e/core-loop.spec.ts`) — the whole loop: post court → browse → assert
@@ -346,8 +351,9 @@ This is a deliberately lean MVP. Known limitations:
   notifications, or websockets. A buyer sees a slot as taken only on their next load.
 - **Single region.** Times, phone format defaults, and venues are Singapore-specific by design
   (though phone numbers from several other countries are accepted).
-- **Manage link = full control.** Anyone with the secret link can edit/delete the post. Lose
-  it and you can't manage your post (it still auto-expires after its date).
+- **Manage link = full control over the whole batch.** Anyone with the secret link can edit
+  or delete every post created in that submission, not just one. Lose it and you can't manage
+  those posts (they still auto-expire after their date).
 
 **Explicitly out of scope for the MVP:** auth, payments, a Telegram bot, notifications,
 realtime updates, a moderation dashboard, "looking for a game" reverse posts, and venue

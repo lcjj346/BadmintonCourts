@@ -1,7 +1,8 @@
+import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todaySgt, strToDate } from "@/lib/time";
-import type { BoardFilters, CreateSessionInput } from "@/lib/schemas";
+import type { BoardFilters, CreateSessionItemInput } from "@/lib/schemas";
 import { ActivePostCapError, sweepExpired } from "@/services/listingService";
 import { SKILL_ORDER } from "@/lib/skill";
 
@@ -51,29 +52,38 @@ export async function getSession(id: string): Promise<PublicSession | null> {
   return prisma.gameSession.findUnique({ where: { id }, select: PUBLIC_SESSION_SELECT });
 }
 
-export async function createSession(
-  input: CreateSessionInput,
-): Promise<{ id: string; editToken: string }> {
+/** Creates every item under one shared batchToken — the manage link for all of them. */
+export async function createSessionBatch(
+  items: CreateSessionItemInput[],
+  phone: string,
+): Promise<{ batchToken: string; ids: string[] }> {
   const active = await prisma.gameSession.count({
-    where: { phone: input.phone, status: "OPEN" },
+    where: { phone, status: "OPEN" },
   });
-  if (active >= 5) throw new ActivePostCapError();
+  if (active + items.length > 5) throw new ActivePostCapError();
 
-  return prisma.gameSession.create({
-    data: {
-      venueId: input.venueId,
-      date: strToDate(input.date),
-      startTime: input.startTime,
-      endTime: input.endTime,
-      playersNeeded: input.playersNeeded,
-      skillMin: input.skillMin,
-      skillMax: input.skillMax,
-      pricePerPlayerCents: input.pricePerPlayerCents,
-      notes: input.notes,
-      phone: input.phone,
-    },
-    select: { id: true, editToken: true },
-  });
+  const batchToken = randomUUID();
+  const rows = await prisma.$transaction(
+    items.map((item) =>
+      prisma.gameSession.create({
+        data: {
+          venueId: item.venueId,
+          date: strToDate(item.date),
+          startTime: item.startTime,
+          endTime: item.endTime,
+          playersNeeded: item.playersNeeded,
+          skillMin: item.skillMin,
+          skillMax: item.skillMax,
+          pricePerPlayerCents: item.pricePerPlayerCents,
+          notes: item.notes,
+          phone,
+          batchToken,
+        },
+        select: { id: true },
+      }),
+    ),
+  );
+  return { batchToken, ids: rows.map((r) => r.id) };
 }
 
 export async function revealSessionPhone(id: string): Promise<string | null> {

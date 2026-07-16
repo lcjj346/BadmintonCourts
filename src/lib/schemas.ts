@@ -33,20 +33,10 @@ const honeypot = z
   .optional()
   .or(z.literal(""));
 
-const postBase = z.object({
-  venueId: z.string().uuid(),
-  date: dateInRange,
-  startTime: timeStr,
-  endTime: timeStr,
-  notes: z.string().max(300).optional(),
-  phone: phoneSchema,
-  website: honeypot, // honeypot: real users never see or fill this
-});
-
 const timeOrder = (v: { startTime: string; endTime: string }) => v.endTime > v.startTime;
 const TIME_ORDER_MSG = { message: "End time must be after start time", path: ["endTime"] };
 
-// Can't post a slot that has already started today. Future dates are unaffected.
+// Can't post/edit a slot to start in the past today. Future dates are unaffected.
 const futureStartToday = (v: { date: string; startTime: string }) =>
   v.date !== todaySgt() || v.startTime > nowSgtTime();
 const FUTURE_START_MSG = {
@@ -54,17 +44,62 @@ const FUTURE_START_MSG = {
   path: ["startTime"],
 };
 
-export const createListingSchema = postBase
-  .extend({ priceCents: z.number().int().min(0).max(50_000).nullable() })
-  .refine(timeOrder, TIME_ORDER_MSG)
-  .refine(futureStartToday, FUTURE_START_MSG);
-
 const skillIndex = (s: (typeof SKILL_LEVELS)[number]) => SKILL_LEVELS.indexOf(s);
 const skillOrder = (v: { skillMin: (typeof SKILL_LEVELS)[number]; skillMax: (typeof SKILL_LEVELS)[number] }) =>
   skillIndex(v.skillMax) >= skillIndex(v.skillMin);
 const SKILL_ORDER_MSG = { message: "Max skill must be the same as or higher than min skill", path: ["skillMax"] };
 
-export const createSessionSchema = postBase
+/** Max court/game entries in a single post submission (one shared manage link). */
+export const MAX_BATCH_ITEMS = 10;
+
+// --- Per-item fields shared by both post kinds and by edits (no venue/phone — those aren't editable). ---
+const itemBase = z.object({
+  date: dateInRange,
+  startTime: timeStr,
+  endTime: timeStr,
+  notes: z.string().max(300).optional(),
+});
+
+// --- Create: one item = one court/game within a batch submission. ---
+const createListingItemBase = itemBase.extend({
+  venueId: z.string().uuid(),
+  priceCents: z.number().int().min(0).max(50_000).nullable(),
+});
+export const createListingItemSchema = createListingItemBase
+  .refine(timeOrder, TIME_ORDER_MSG)
+  .refine(futureStartToday, FUTURE_START_MSG);
+
+const createSessionItemBase = itemBase.extend({
+  venueId: z.string().uuid(),
+  playersNeeded: z.number().int().min(1).max(50),
+  skillMin: z.enum(SKILL_LEVELS),
+  skillMax: z.enum(SKILL_LEVELS),
+  pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),
+});
+export const createSessionItemSchema = createSessionItemBase
+  .refine(timeOrder, TIME_ORDER_MSG)
+  .refine(futureStartToday, FUTURE_START_MSG)
+  .refine(skillOrder, SKILL_ORDER_MSG);
+
+const batchEnvelope = z.object({
+  phone: phoneSchema,
+  website: honeypot, // honeypot: real users never see or fill this
+});
+
+export const createListingSchema = batchEnvelope.extend({
+  items: z.array(createListingItemSchema).min(1).max(MAX_BATCH_ITEMS),
+});
+export const createSessionSchema = batchEnvelope.extend({
+  items: z.array(createSessionItemSchema).min(1).max(MAX_BATCH_ITEMS),
+});
+
+// --- Edit: one existing court/game, from its manage page. Venue is fixed (delete + repost to change it). ---
+export const editListingSchema = itemBase
+  .extend({ priceCents: z.number().int().min(0).max(50_000).nullable() })
+  .refine(timeOrder, TIME_ORDER_MSG)
+  .refine(futureStartToday, FUTURE_START_MSG);
+
+export const editSessionSchema = itemBase
   .extend({
     playersNeeded: z.number().int().min(1).max(50),
     skillMin: z.enum(SKILL_LEVELS),
@@ -92,6 +127,10 @@ export const venueSuggestionSchema = z.object({
   details: z.string().max(300).optional(),
 });
 
+export type CreateListingItemInput = z.infer<typeof createListingItemSchema>;
+export type CreateSessionItemInput = z.infer<typeof createSessionItemSchema>;
 export type CreateListingInput = z.infer<typeof createListingSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
+export type EditListingInput = z.infer<typeof editListingSchema>;
+export type EditSessionInput = z.infer<typeof editSessionSchema>;
 export type BoardFilters = z.infer<typeof boardFilterSchema>;

@@ -1,7 +1,7 @@
 import { ok, fail, handleError } from "@/lib/api";
 import { boardFilterSchema, createSessionSchema } from "@/lib/schemas";
 import { getClientIp, hashIp } from "@/lib/ip";
-import { listSessions, createSession } from "@/services/sessionService";
+import { listSessions, createSessionBatch } from "@/services/sessionService";
 import { assertCreateAllowed, recordCreate } from "@/services/rateLimitService";
 
 export async function GET(req: Request) {
@@ -21,12 +21,12 @@ export async function POST(req: Request) {
     if (!body.success) {
       // Honeypot trips look like success to the bot, write nothing.
       const issue = body.error.issues[0];
-      if (issue?.path[0] === "website") return ok({ id: "ok", editToken: "ok" }, 201);
+      if (issue?.path[0] === "website") return ok({ batchToken: "ok", ids: [] }, 201);
       return fail(issue?.message ?? "Invalid input", 400);
     }
     const ipHash = hashIp(getClientIp(req));
     await assertCreateAllowed(ipHash);
-    const created = await createSession(body.data);
+    const created = await createSessionBatch(body.data.items, body.data.phone);
     await recordCreate(ipHash);
     return ok(created, 201);
   } catch (e) {

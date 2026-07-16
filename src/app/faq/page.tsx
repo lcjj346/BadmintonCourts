@@ -58,12 +58,20 @@ export default function FaqPage() {
         <Card title="How do I edit, mark sold/filled, or delete my post?">
           <p>
             Only through the secret manage link shown right after you post — there are no accounts,
-            so save that link. For games, you can also update the number of players still needed from
-            that manage link.
+            so save that link. From there you can edit the date, time, price, and notes (and for
+            games, players needed and skill level) at any time before it&apos;s closed.
           </p>
           <p>
             If you lose it you can&apos;t edit the post, but it expires by itself after the date, and
             the number is scrubbed 14 days later.
+          </p>
+        </Card>
+
+        <Card title="Can I post more than one court or game at once?">
+          <p>
+            Yes — tap &quot;+ Add another court&quot; (or game) on the post form to list several at
+            once, each with its own venue, date, and time. You&apos;ll get a single manage link that
+            controls all of them, so you don&apos;t need to save a separate link for each one.
           </p>
         </Card>
 
