@@ -11,7 +11,11 @@
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
     "prod:migrate": "dotenv -e .env.production.local -- npx prisma migrate deploy",
-    "prod:seed": "dotenv -e .env.production.local -- npx prisma db seed"
+    "prod:seed": "dotenv -e .env.production.local -- npx prisma db seed",
+    "loadtest:seed": "ts-node scripts/loadTestSeed.ts",
+    "loadtest:cleanup": "ts-node scripts/loadTestSeed.ts --cleanup",
+    "loadtest:seed:prod": "dotenv -e .env.production.local -- npm run loadtest:seed --",
+    "loadtest:cleanup:prod": "dotenv -e .env.production.local -- npm run loadtest:cleanup"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -26,6 +30,11 @@
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
