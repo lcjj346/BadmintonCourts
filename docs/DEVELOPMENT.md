@@ -227,7 +227,7 @@ imports dayjs). `createdAt`/`updatedAt` remain normal UTC machine timestamps.
   heartbeat: 300/hr per IP (limits are generous because Singapore mobile carriers use CGNAT,
   sharing IPs). See `src/services/rateLimitService.ts` for the source of truth.
 - **Anti-spam** — hidden honeypot field (a filled `website` field silently returns success
-  and writes nothing), phone/Telegram format validation, max 5 active posts per contact
+  and writes nothing), phone/Telegram format validation, max 10 active posts per contact
   (phone if given, else Telegram handle — see `batchService.ts`'s `contactWhere`).
 - **PDPA-minded** — IPs are stored only as salted SHA-256 hashes; phone numbers are scrubbed
   14 days after a post expires; the footer states exactly what's retained.

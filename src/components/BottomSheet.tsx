@@ -1,12 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+
 export function BottomSheet({
   open, onClose, title, children,
 }: {
   open: boolean; onClose: () => void; title: string; children: React.ReactNode;
 }) {
-  if (!open) return null;
-  return (
+  // Portal to <body> so a "fixed inset-0" sheet always covers the full
+  // viewport — an ancestor with any transform/filter/backdrop-filter (like the
+  // sticky filter bar) would otherwise become the containing block for fixed
+  // descendants and shrink the sheet down to that ancestor's box.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!open || !mounted) return null;
+  return createPortal(
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title}>
       <div
         data-testid="sheet-backdrop"
@@ -18,6 +28,7 @@ export function BottomSheet({
         <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.14em] text-court">{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

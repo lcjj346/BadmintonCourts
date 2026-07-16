@@ -19,10 +19,19 @@ const TEST_PHONES = ["+6591234567", "+6581234567"];
 export default async function globalSetup() {
   loadEnvConfig(process.cwd());
   const prisma = new PrismaClient();
+  // Telegram-only posts (no phone) use handles prefixed like this in the specs —
+  // match them too, since the phone filter above misses them entirely.
+  const testContact = {
+    OR: [
+      { phone: { in: TEST_PHONES } },
+      { telegramHandle: { startsWith: "test_user_" } },
+      { telegramHandle: { startsWith: "edited_user_" } },
+    ],
+  };
   try {
     await prisma.rateLimitEvent.deleteMany({ where: { action: "CREATE" } });
-    await prisma.listing.deleteMany({ where: { phone: { in: TEST_PHONES } } });
-    await prisma.gameSession.deleteMany({ where: { phone: { in: TEST_PHONES } } });
+    await prisma.listing.deleteMany({ where: testContact });
+    await prisma.gameSession.deleteMany({ where: testContact });
   } finally {
     await prisma.$disconnect();
   }

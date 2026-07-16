@@ -72,20 +72,27 @@ export default async function BoardPage({
         <Link href={`/?tab=players${dateQ}`} className={tabClass(tab === "players")}>Players</Link>
       </nav>
 
-      <DateStrip />
-      <FilterBar venues={venues} showSkill={tab === "players"} />
+      <div className="sticky top-14 z-20 -mx-4 bg-paper/95 px-4 backdrop-blur-md">
+        <DateStrip />
+        <FilterBar venues={venues} showSkill={tab === "players"} />
+      </div>
 
       {rows.length === 0 && (
-        <p className="py-12 text-center text-sm text-gray-400">
-          Nothing here yet — try another date or filter, or post the first one.
-        </p>
+        <div className="flex flex-col items-center gap-3 py-14 text-center">
+          <svg aria-hidden="true" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+          </svg>
+          <p className="text-sm font-medium text-gray-500">No {tab === "courts" ? "courts" : "players"} match your filters</p>
+          <p className="text-xs text-gray-400">Try another date, clear a filter, or be the first to post.</p>
+        </div>
       )}
 
       {grouped ? (
         <div className="mt-2 space-y-4">
           {groups.map((g) => (
             <section key={g.key}>
-              <h2 className="sticky top-14 z-10 bg-paper/85 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 backdrop-blur">
+              <h2 className="py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                 {g.label}
               </h2>
               <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">

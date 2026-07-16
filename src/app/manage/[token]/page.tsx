@@ -62,21 +62,33 @@ export default async function ManagePage({
     </>
   );
 
+  const backLink = (
+    <Link href="/" className="mt-4 block text-center text-sm text-gray-400">← Back to the board</Link>
+  );
+
   return (
     <main className="mx-auto w-full max-w-lg pt-6">
-      {created && (
-        <div className="rounded-2xl bg-court-light p-4">
-          <h1 className="font-bold text-court">Posted!</h1>
-          <p className="mt-1 text-sm text-court">
-            This page&apos;s link is the only way to edit, mark {isGame ? "filled" : "sold"}, or delete{" "}
-            {multiple ? `these ${posts.length} posts` : "your post"} — there&apos;s no login.
-          </p>
-        </div>
+      {created ? (
+        <SaveLinkGate
+          banner={
+            <div className="rounded-2xl bg-court-light p-4">
+              <h1 className="font-bold text-court">Posted!</h1>
+              <p className="mt-1 text-sm text-court">
+                This page&apos;s link is the only way to edit, mark {isGame ? "filled" : "sold"}, or delete{" "}
+                {multiple ? `these ${posts.length} posts` : "your post"} — there&apos;s no login.
+              </p>
+            </div>
+          }
+          footer={backLink}
+        >
+          <div className="mt-4">{list}</div>
+        </SaveLinkGate>
+      ) : (
+        <>
+          <div className="mt-4">{list}</div>
+          {backLink}
+        </>
       )}
-
-      <div className="mt-4">{created ? <SaveLinkGate>{list}</SaveLinkGate> : list}</div>
-
-      <Link href="/" className="mt-4 block text-center text-sm text-gray-400">← Back to the board</Link>
     </main>
   );
 }

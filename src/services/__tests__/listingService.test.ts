@@ -81,9 +81,9 @@ describe("listingService", () => {
     expect(await listListings({ timeFrom: "08:00", timeTo: "10:00" })).toHaveLength(1);
   });
 
-  it("enforces max 5 active listings per phone", async () => {
+  it("enforces max 10 active listings per phone", async () => {
     const venue = await makeVenue();
-    for (let i = 0; i < 5; i++) await createListing(input(venue.id));
+    for (let i = 0; i < 10; i++) await createListing(input(venue.id));
     await expect(createListing(input(venue.id))).rejects.toThrow(ActivePostCapError);
     await expect(createListing(input(venue.id, { phone: "+6581234567" }))).resolves.toBeTruthy();
   });
@@ -162,10 +162,10 @@ describe("listingService", () => {
     expect(rows.every((r) => r.batchToken === batchToken)).toBe(true);
   });
 
-  it("counts every item in a batch toward the 5-active-per-phone cap", async () => {
+  it("counts every item in a batch toward the 10-active-per-phone cap", async () => {
     const venue = await makeVenue();
     const { phone, ...item } = input(venue.id);
-    const items = Array.from({ length: 6 }, () => item) as Parameters<typeof createListingBatch>[0];
+    const items = Array.from({ length: 11 }, () => item) as Parameters<typeof createListingBatch>[0];
     await expect(createListingBatch(items, { phone: phone as string })).rejects.toThrow(ActivePostCapError);
   });
 
