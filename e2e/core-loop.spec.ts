@@ -33,6 +33,25 @@ async function deletePost(page: Page, nth = 0) {
   await page.getByRole("dialog", { name: "Delete post?" }).getByRole("button", { name: /^delete$/i }).click();
 }
 
+// Waits for the post-submit redirect to the manage page. A plain toHaveURL
+// timeout gives no clue *why* the app didn't navigate (validation error?
+// server rejection? network failure?) — this dumps whatever error text was
+// left on the page directly into the failure message, so a CI-only failure
+// is diagnosable straight from the log instead of needing the HTML report.
+async function expectManageRedirect(page: Page, pattern: RegExp | string = /\/manage\/[0-9a-f-]{36}\?created=1/) {
+  const ok = await page
+    .waitForURL(pattern, { timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!ok) {
+    const errors = await page.locator(".text-red-600").allTextContents();
+    throw new Error(
+      `Expected navigation matching ${pattern} but the page stayed at ${page.url()}. ` +
+        `Visible error text on page: ${JSON.stringify(errors)}`,
+    );
+  }
+}
+
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {
   // Post a court listing.
   await page.goto("/post/court");
@@ -45,7 +64,7 @@ test("court: post → browse → detail → reveal → mark sold", async ({ page
   await page.getByRole("button", { name: /post court/i }).click();
 
   // Success = manage page, gated behind an explicit "copy my manage link" click.
-  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  await expectManageRedirect(page);
   await expect(page.getByText(/copy your manage link before continuing/i)).toBeVisible();
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
@@ -96,7 +115,7 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await page.getByPlaceholder("9123 4567").fill("81234567");
   await page.getByRole("button", { name: /post game/i }).click();
 
-  await expect(page).toHaveURL(/\/manage\//);
+  await expectManageRedirect(page, /\/manage\//);
   const manageUrl = page.url().split("?")[0];
 
   // Manage actions are gated behind the "copy my manage link" click.
@@ -145,7 +164,7 @@ test("posts two courts in one batch under a single manage link", async ({ page }
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post 2 courts/i }).click();
 
-  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  await expectManageRedirect(page);
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
 
@@ -174,7 +193,7 @@ test("can't reach 'add another' before saving the manage link, and adding one re
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
 
-  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  await expectManageRedirect(page);
   const manageUrl = page.url().split("?")[0];
 
   // Before copying the link, "+ Add another court" must not be reachable — otherwise a
@@ -194,7 +213,7 @@ test("can't reach 'add another' before saving the manage link, and adding one re
 
   // Landing back on the same manage link, the save-link gate fires again — a second
   // safety net even for a poster who already copied it once.
-  await expect(page).toHaveURL(`${manageUrl}?created=1`);
+  await expectManageRedirect(page, `${manageUrl}?created=1`);
   await expect(page.getByText(/copy your manage link before continuing/i)).toBeVisible();
   await page.getByRole("button", { name: /copy my manage link/i }).click();
   await expect(page.getByText("$16")).toBeVisible();
@@ -219,7 +238,7 @@ test("posts at a venue not in the list, and it shows up filtered by region", asy
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
 
-  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  await expectManageRedirect(page);
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
   await expect(page.getByText(venueName)).toBeVisible();
@@ -245,7 +264,7 @@ test("posts with only a Telegram handle (no phone), reveals a Telegram link, and
   await page.getByPlaceholder("@username").fill(handle);
   await page.getByRole("button", { name: /post court/i }).click();
 
-  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  await expectManageRedirect(page);
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
 
@@ -277,7 +296,7 @@ test("editing a post can switch its contact from phone to Telegram", async ({ pa
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
 
-  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  await expectManageRedirect(page);
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
 
