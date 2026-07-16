@@ -3,10 +3,11 @@ import { prisma } from "@/lib/db";
 import { todaySgt, strToDate } from "@/lib/time";
 import type { BoardFilters, CreateSessionInput } from "@/lib/schemas";
 import { ActivePostCapError, sweepExpired } from "@/services/listingService";
+import { SKILL_ORDER } from "@/lib/skill";
 
 export const PUBLIC_SESSION_SELECT = {
   id: true, date: true, startTime: true, endTime: true,
-  playersNeeded: true, skillLevel: true, pricePerPlayerCents: true,
+  playersNeeded: true, skillMin: true, skillMax: true, pricePerPlayerCents: true,
   notes: true, status: true, createdAt: true,
   venue: {
     select: { id: true, name: true, region: true, venueType: true, availabilityNote: true },
@@ -17,7 +18,7 @@ export type PublicSession = Prisma.GameSessionGetPayload<{ select: typeof PUBLIC
 
 export async function listSessions(filters: BoardFilters): Promise<PublicSession[]> {
   await sweepExpired();
-  return prisma.gameSession.findMany({
+  const rows = await prisma.gameSession.findMany({
     where: {
       date: filters.date ? strToDate(filters.date) : { gte: strToDate(todaySgt()) },
       status: filters.available ? "OPEN" : { in: ["OPEN", "FILLED"] },
@@ -31,12 +32,19 @@ export async function listSessions(filters: BoardFilters): Promise<PublicSession
             },
           }
         : {}),
-      ...(filters.skill ? { skillLevel: filters.skill } : {}),
     },
     select: PUBLIC_SESSION_SELECT,
     // Postgres enums sort by declared order (OPEN, FILLED); asc puts OPEN first
     orderBy: [{ date: "asc" }, { status: "asc" }, { startTime: "asc" }],
   });
+
+  // A poster's skill is a RANGE, so "filter by skill X" means "X falls within [skillMin, skillMax]".
+  // That overlap check isn't a plain column comparison, so it's applied here rather than in Prisma's `where`.
+  if (!filters.skill) return rows;
+  const target = SKILL_ORDER.indexOf(filters.skill);
+  return rows.filter(
+    (r) => SKILL_ORDER.indexOf(r.skillMin) <= target && target <= SKILL_ORDER.indexOf(r.skillMax),
+  );
 }
 
 export async function getSession(id: string): Promise<PublicSession | null> {
@@ -58,7 +66,8 @@ export async function createSession(
       startTime: input.startTime,
       endTime: input.endTime,
       playersNeeded: input.playersNeeded,
-      skillLevel: input.skillLevel,
+      skillMin: input.skillMin,
+      skillMax: input.skillMax,
       pricePerPlayerCents: input.pricePerPlayerCents,
       notes: input.notes,
       phone: input.phone,

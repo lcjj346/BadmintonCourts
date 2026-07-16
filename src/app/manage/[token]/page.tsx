@@ -5,7 +5,7 @@ import { findPostByToken } from "@/services/manageService";
 import { formatDateLabel } from "@/lib/time";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ManageActions } from "@/components/ManageActions";
-import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { SaveLinkGate } from "@/components/SaveLinkGate";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -28,13 +28,12 @@ export default async function ManagePage({
     <main className="mx-auto w-full max-w-lg pt-6">
       {created && (
         <div className="rounded-2xl bg-court-light p-4">
-          <h1 className="font-bold text-court">🎉 Posted!</h1>
+          <h1 className="font-bold text-court">Posted!</h1>
           <p className="mt-1 text-sm text-court">
-            <strong>Save this page&apos;s link.</strong> It&apos;s the only way to mark your post
+            This page&apos;s link is the only way to mark your post
             {type === "listing" ? " sold" : " filled"}
             {type === "session" ? ", update players needed," : ""} or delete it — there&apos;s no login.
           </p>
-          <CopyLinkButton />
         </div>
       )}
 
@@ -46,7 +45,13 @@ export default async function ManagePage({
         <p className="mt-1 text-sm text-gray-500">
           {formatDateLabel(post.date)} · {post.startTime}–{post.endTime}
         </p>
-        <ManageActions token={token} type={type} closed={closed} playersNeeded={post.playersNeeded} />
+        {created ? (
+          <SaveLinkGate>
+            <ManageActions token={token} type={type} closed={closed} playersNeeded={post.playersNeeded} />
+          </SaveLinkGate>
+        ) : (
+          <ManageActions token={token} type={type} closed={closed} playersNeeded={post.playersNeeded} />
+        )}
       </div>
 
       <Link href="/" className="mt-4 block text-center text-sm text-gray-400">← Back to the board</Link>

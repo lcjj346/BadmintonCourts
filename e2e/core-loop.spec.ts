@@ -22,10 +22,11 @@ test("court: post → browse → detail → reveal → mark sold", async ({ page
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
 
-  // Success = manage page with the "save this link" banner.
+  // Success = manage page, gated behind an explicit "copy my manage link" click.
   await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
-  await expect(page.getByText(/save this page's link/i)).toBeVisible();
+  await expect(page.getByText(/copy your manage link before continuing/i)).toBeVisible();
   const manageUrl = page.url().split("?")[0];
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
 
   // Browse: today's board shows it, and the phone is nowhere in the HTML.
   await page.goto("/");
@@ -67,12 +68,15 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
   await page.getByLabel("Date").fill(tomorrowSgt());
-  await page.getByLabel("Skill level").selectOption("ADVANCED");
+  await page.getByLabel("Skill level from").selectOption("ADVANCED");
   await page.getByPlaceholder("9123 4567").fill("81234567");
   await page.getByRole("button", { name: /post game/i }).click();
 
   await expect(page).toHaveURL(/\/manage\//);
   const manageUrl = page.url().split("?")[0];
+
+  // Manage actions are gated behind the "copy my manage link" click.
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
 
   // Poster edits "Players still needed" from the manage link → 1, and it sticks after refresh.
   await page.getByLabel("Players still needed").selectOption("1");

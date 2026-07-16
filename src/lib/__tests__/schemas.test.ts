@@ -76,7 +76,7 @@ describe("createListingSchema", () => {
 describe("createSessionSchema", () => {
   it("accepts a valid session", () => {
     const r = createSessionSchema.safeParse({
-      ...base, playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
+      ...base, playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
     });
     expect(r.success).toBe(true);
   });
@@ -84,14 +84,14 @@ describe("createSessionSchema", () => {
   it("rejects playersNeeded out of range", () => {
     for (const playersNeeded of [0, 51]) {
       expect(createSessionSchema.safeParse({
-        ...base, playersNeeded, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null,
+        ...base, playersNeeded, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
       }).success).toBe(false);
     }
   });
 
   it("accepts playersNeeded up to 50", () => {
     expect(createSessionSchema.safeParse({
-      ...base, playersNeeded: 50, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null,
+      ...base, playersNeeded: 50, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
     }).success).toBe(true);
   });
 
@@ -101,14 +101,26 @@ describe("createSessionSchema", () => {
       "MID_INTERMEDIATE", "HIGH_INTERMEDIATE", "ADVANCED",
     ]) {
       expect(createSessionSchema.safeParse({
-        ...base, playersNeeded: 2, skillLevel, pricePerPlayerCents: null,
+        ...base, playersNeeded: 2, skillMin: skillLevel, skillMax: skillLevel, pricePerPlayerCents: null,
       }).success).toBe(true);
     }
   });
 
   it("rejects an old three-value skill level", () => {
     expect(createSessionSchema.safeParse({
-      ...base, playersNeeded: 2, skillLevel: "INTERMEDIATE", pricePerPlayerCents: null,
+      ...base, playersNeeded: 2, skillMin: "INTERMEDIATE", skillMax: "INTERMEDIATE", pricePerPlayerCents: null,
+    }).success).toBe(false);
+  });
+
+  it("accepts a skill range where max is higher than min", () => {
+    expect(createSessionSchema.safeParse({
+      ...base, playersNeeded: 2, skillMin: "MID_BEGINNER", skillMax: "LOW_INTERMEDIATE", pricePerPlayerCents: null,
+    }).success).toBe(true);
+  });
+
+  it("rejects a skill range where max is lower than min", () => {
+    expect(createSessionSchema.safeParse({
+      ...base, playersNeeded: 2, skillMin: "LOW_INTERMEDIATE", skillMax: "MID_BEGINNER", pricePerPlayerCents: null,
     }).success).toBe(false);
   });
 });
