@@ -26,7 +26,12 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
         <p className="mt-1 text-sm text-gray-500">
           {formatDateLabel(dateToStr(listing.date))} · {listing.startTime}–{listing.endTime}
         </p>
-        <p className="text-sm text-gray-500">{venue.region}</p>
+        <p className="text-sm text-gray-500">
+          {venue.region} ·{" "}
+          <a href={venue.mapsUrl} target="_blank" rel="noopener noreferrer" className="text-court underline">
+            Open in Google Maps
+          </a>
+        </p>
         {venue.availabilityNote && (
           <p className="mt-1 text-xs text-amber-700">{venue.availabilityNote}</p>
         )}

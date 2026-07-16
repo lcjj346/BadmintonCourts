@@ -26,7 +26,9 @@ export async function POST(req: Request) {
     }
     const ipHash = hashIp(getClientIp(req));
     await assertCreateAllowed(ipHash);
-    const created = await createListingBatch(body.data.items, body.data.phone);
+    const created = await createListingBatch(body.data.items, {
+      phone: body.data.phone, telegramHandle: body.data.telegramHandle,
+    });
     await recordCreate(ipHash);
     return ok(created, 201);
   } catch (e) {

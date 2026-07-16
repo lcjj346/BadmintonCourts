@@ -129,6 +129,31 @@ describe("createListingSchema", () => {
     expect(r.success).toBe(false);
   });
 
+  it("accepts a Telegram handle in place of phone", () => {
+    const { phone: _phone, ...withoutPhone } = batch([{ ...item, priceCents: 0 }]);
+    const r = createListingSchema.safeParse({ ...withoutPhone, telegramHandle: "some_user" });
+    expect(r.success).toBe(true);
+  });
+
+  it("accepts both phone and Telegram handle", () => {
+    const r = createListingSchema.safeParse({
+      ...batch([{ ...item, priceCents: 0 }]), telegramHandle: "some_user",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects neither phone nor Telegram handle", () => {
+    const { phone: _phone, ...withoutPhone } = batch([{ ...item, priceCents: 0 }]);
+    expect(createListingSchema.safeParse(withoutPhone).success).toBe(false);
+  });
+
+  it("rejects an invalid Telegram handle", () => {
+    const { phone: _phone, ...withoutPhone } = batch([{ ...item, priceCents: 0 }]);
+    for (const telegramHandle of ["abc", "1abc", "has space", "-leading-dash"]) {
+      expect(createListingSchema.safeParse({ ...withoutPhone, telegramHandle }).success).toBe(false);
+    }
+  });
+
   it("caps notes at 300 chars", () => {
     expect(
       createListingSchema.safeParse(batch([{ ...item, notes: "x".repeat(301), priceCents: 0 }])).success,

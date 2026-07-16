@@ -6,8 +6,10 @@ import { useState } from "react";
 const COUNTRY_CODES = ["+852", "+886", "+65", "+60", "+62", "+63", "+66", "+84", "+91", "+86", "+61", "+44", "+1"]
   .sort((a, b) => b.length - a.length);
 
+type Contact = { phone?: string | null; telegramHandle?: string | null };
+
 export function RevealButton({ endpoint }: { endpoint: string }) {
-  const [phone, setPhone] = useState<string | null>(null);
+  const [contact, setContact] = useState<Contact | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,7 +20,7 @@ export function RevealButton({ endpoint }: { endpoint: string }) {
       const res = await fetch(endpoint, { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.data) setError(json.error ?? "Something went wrong");
-      else setPhone(json.data.phone);
+      else setContact(json.data);
     } catch {
       setError("Network error — try again");
     } finally {
@@ -26,26 +28,44 @@ export function RevealButton({ endpoint }: { endpoint: string }) {
     }
   }
 
-  if (phone) {
+  if (contact) {
+    const { phone, telegramHandle } = contact;
     // phone arrives as stored E.164, e.g. "+6591234567" or "+60123456789".
-    let pretty: string;
-    if (phone.startsWith("+65")) {
-      const local = phone.slice(3);
-      pretty = `+65 ${local.slice(0, 4)} ${local.slice(4)}`;
-    } else {
-      const code = COUNTRY_CODES.find((c) => phone.startsWith(c));
-      pretty = code ? `${code} ${phone.slice(code.length)}` : phone;
+    let pretty: string | null = null;
+    if (phone) {
+      if (phone.startsWith("+65")) {
+        const local = phone.slice(3);
+        pretty = `+65 ${local.slice(0, 4)} ${local.slice(4)}`;
+      } else {
+        const code = COUNTRY_CODES.find((c) => phone.startsWith(c));
+        pretty = code ? `${code} ${phone.slice(code.length)}` : phone;
+      }
     }
     return (
       <div className="rounded-xl bg-court-light p-4 text-center">
-        <div className="text-xl font-bold text-court">{pretty}</div>
+        {pretty && <div className="text-xl font-bold text-court">{pretty}</div>}
+        {telegramHandle && (
+          <div className={`font-bold text-court ${pretty ? "mt-1 text-sm" : "text-xl"}`}>@{telegramHandle}</div>
+        )}
         <div className="mt-3 flex justify-center gap-3">
-          <a href={`tel:${phone}`} className="rounded-full bg-court px-4 py-2 text-sm font-semibold text-white">
-            Call
-          </a>
-          <a href={`https://wa.me/${phone.replace("+", "")}`} className="rounded-full border border-court px-4 py-2 text-sm font-semibold text-court">
-            WhatsApp
-          </a>
+          {phone && (
+            <>
+              <a href={`tel:${phone}`} className="rounded-full bg-court px-4 py-2 text-sm font-semibold text-white">
+                Call
+              </a>
+              <a href={`https://wa.me/${phone.replace("+", "")}`} className="rounded-full border border-court px-4 py-2 text-sm font-semibold text-court">
+                WhatsApp
+              </a>
+            </>
+          )}
+          {telegramHandle && (
+            <a
+              href={`https://t.me/${telegramHandle}`}
+              className="rounded-full border border-court px-4 py-2 text-sm font-semibold text-court"
+            >
+              Telegram
+            </a>
+          )}
         </div>
       </div>
     );

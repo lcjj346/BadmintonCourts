@@ -216,3 +216,36 @@ test("posts at a venue not in the list, and it shows up filtered by region", asy
   await page.getByRole("button", { name: /delete post/i }).click();
   await expect(page).toHaveURL("/");
 });
+
+test("posts with only a Telegram handle (no phone), reveals a Telegram link, and a Maps link works", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  const handle = `test_user_${Date.now()}`;
+
+  await page.goto("/post/court");
+  await page.getByRole("button", { name: /choose a venue/i }).click();
+  await page.getByPlaceholder(/search venues/i).fill("choa chu");
+  await page.getByRole("button", { name: /choa chu kang/i }).click();
+  await page.getByLabel("Date").fill(tomorrowSgt());
+  await page.getByPlaceholder(/negotiable/i).fill("16");
+  await page.getByPlaceholder("@username").fill(handle);
+  await page.getByRole("button", { name: /post court/i }).click();
+
+  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  const manageUrl = page.url().split("?")[0];
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
+
+  // Browse to the court and reveal — Telegram link shows, no phone/WhatsApp button since none was given.
+  await page.goto("/");
+  await page.getByRole("link", { name: /choa chu kang/i }).first().click();
+  await expect(page.getByText(/open in google maps/i)).toHaveAttribute(
+    "href", /^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=/,
+  );
+  await page.getByRole("button", { name: /reveal/i }).click();
+  await expect(page.getByText(`@${handle}`)).toBeVisible();
+  await expect(page.getByRole("link", { name: /telegram/i })).toHaveAttribute("href", `https://t.me/${handle}`);
+  await expect(page.getByRole("link", { name: /^call$/i })).toHaveCount(0);
+
+  await page.goto(manageUrl);
+  await page.getByRole("button", { name: /delete post/i }).click();
+  await expect(page).toHaveURL("/");
+});

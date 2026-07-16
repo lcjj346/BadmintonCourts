@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { todaySgt, strToDate } from "@/lib/time";
 import type { BoardFilters, CreateSessionItemInput } from "@/lib/schemas";
 import { sweepExpired } from "@/services/listingService";
-import { assertUnderActiveCap, newBatchToken, createBatch } from "@/services/batchService";
+import { assertUnderActiveCap, newBatchToken, createBatch, contactWhere, type Contact } from "@/services/batchService";
 import { SKILL_ORDER } from "@/lib/skill";
 
 const PUBLIC_SESSION_SELECT = {
@@ -12,7 +12,7 @@ const PUBLIC_SESSION_SELECT = {
   notes: true, status: true, createdAt: true,
   customVenueName: true, customRegion: true,
   venue: {
-    select: { id: true, name: true, region: true, venueType: true, availabilityNote: true },
+    select: { id: true, name: true, region: true, venueType: true, availabilityNote: true, address: true },
   },
 } satisfies Prisma.GameSessionSelect;
 
@@ -55,7 +55,7 @@ export async function getSession(id: string): Promise<PublicSession | null> {
   return prisma.gameSession.findUnique({ where: { id }, select: PUBLIC_SESSION_SELECT });
 }
 
-function sessionCreator(item: CreateSessionItemInput, phone: string, batchToken: string) {
+function sessionCreator(item: CreateSessionItemInput, contact: Contact, batchToken: string) {
   return prisma.gameSession.create({
     data: {
       venueId: item.venueId,
@@ -69,7 +69,8 @@ function sessionCreator(item: CreateSessionItemInput, phone: string, batchToken:
       skillMax: item.skillMax,
       pricePerPlayerCents: item.pricePerPlayerCents,
       notes: item.notes,
-      phone,
+      phone: contact.phone,
+      telegramHandle: contact.telegramHandle,
       batchToken,
     },
     select: { id: true },
@@ -79,33 +80,36 @@ function sessionCreator(item: CreateSessionItemInput, phone: string, batchToken:
 /** Creates every item under one shared batchToken — the manage link for all of them. */
 export async function createSessionBatch(
   items: CreateSessionItemInput[],
-  phone: string,
+  contact: Contact,
 ): Promise<{ batchToken: string; ids: string[] }> {
-  const active = await prisma.gameSession.count({ where: { phone, status: "OPEN" } });
+  const active = await prisma.gameSession.count({ where: { ...contactWhere(contact), status: "OPEN" } });
   assertUnderActiveCap(active, items.length);
 
   const batchToken = newBatchToken();
-  const ids = await createBatch(items.map((item) => sessionCreator(item, phone, batchToken)));
+  const ids = await createBatch(items.map((item) => sessionCreator(item, contact, batchToken)));
   return { batchToken, ids };
 }
 
-/** Appends more sessions to an existing manage link, reusing its phone. Null if the token is unknown or scrubbed. */
+/** Appends more sessions to an existing manage link, reusing its contact info. Null if the token is unknown or scrubbed. */
 export async function addSessionsToBatch(
   batchToken: string,
   items: CreateSessionItemInput[],
 ): Promise<{ ids: string[] } | null> {
-  const existing = await prisma.gameSession.findFirst({ where: { batchToken }, select: { phone: true } });
-  if (!existing?.phone) return null;
-  const phone = existing.phone;
+  const existing = await prisma.gameSession.findFirst({
+    where: { batchToken }, select: { phone: true, telegramHandle: true },
+  });
+  if (!existing || (!existing.phone && !existing.telegramHandle)) return null;
+  const contact: Contact = { phone: existing.phone ?? undefined, telegramHandle: existing.telegramHandle ?? undefined };
 
-  const active = await prisma.gameSession.count({ where: { phone, status: "OPEN" } });
+  const active = await prisma.gameSession.count({ where: { ...contactWhere(contact), status: "OPEN" } });
   assertUnderActiveCap(active, items.length);
 
-  const ids = await createBatch(items.map((item) => sessionCreator(item, phone, batchToken)));
+  const ids = await createBatch(items.map((item) => sessionCreator(item, contact, batchToken)));
   return { ids };
 }
 
-export async function revealSessionPhone(id: string): Promise<string | null> {
-  const row = await prisma.gameSession.findUnique({ where: { id }, select: { phone: true } });
-  return row?.phone ?? null;
+export async function revealSessionContact(id: string): Promise<Contact | null> {
+  const row = await prisma.gameSession.findUnique({ where: { id }, select: { phone: true, telegramHandle: true } });
+  if (!row) return null;
+  return { phone: row.phone ?? undefined, telegramHandle: row.telegramHandle ?? undefined };
 }

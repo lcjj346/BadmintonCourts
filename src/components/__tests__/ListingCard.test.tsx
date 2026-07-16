@@ -6,7 +6,7 @@ const listing = {
   priceCents: 1600, notes: null, status: "AVAILABLE" as const, createdAt: new Date(),
   customVenueName: null, customRegion: null,
   venue: { id: "v1", name: "Choa Chu Kang Sport Hall", region: "WEST" as const,
-    venueType: "SPORTS_HALL" as const, availabilityNote: null },
+    venueType: "SPORTS_HALL" as const, availabilityNote: null, address: "1 Choa Chu Kang Street 53, Singapore" },
 };
 
 describe("ListingCard", () => {

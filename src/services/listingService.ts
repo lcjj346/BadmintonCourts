@@ -2,7 +2,9 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todaySgt, strToDate, nowSgtTime } from "@/lib/time";
 import type { BoardFilters, CreateListingItemInput } from "@/lib/schemas";
-import { assertUnderActiveCap, newBatchToken, createBatch, ActivePostCapError } from "@/services/batchService";
+import {
+  assertUnderActiveCap, newBatchToken, createBatch, contactWhere, ActivePostCapError, type Contact,
+} from "@/services/batchService";
 
 export { ActivePostCapError };
 
@@ -11,7 +13,7 @@ const PUBLIC_LISTING_SELECT = {
   priceCents: true, notes: true, status: true, createdAt: true,
   customVenueName: true, customRegion: true,
   venue: {
-    select: { id: true, name: true, region: true, venueType: true, availabilityNote: true },
+    select: { id: true, name: true, region: true, venueType: true, availabilityNote: true, address: true },
   },
 } satisfies Prisma.ListingSelect;
 
@@ -42,12 +44,12 @@ export async function sweepExpired(): Promise<void> {
       data: { status: "EXPIRED" },
     }),
     prisma.listing.updateMany({
-      where: { date: { lt: scrubBefore }, phone: { not: null } },
-      data: { phone: null },
+      where: { date: { lt: scrubBefore }, OR: [{ phone: { not: null } }, { telegramHandle: { not: null } }] },
+      data: { phone: null, telegramHandle: null },
     }),
     prisma.gameSession.updateMany({
-      where: { date: { lt: scrubBefore }, phone: { not: null } },
-      data: { phone: null },
+      where: { date: { lt: scrubBefore }, OR: [{ phone: { not: null } }, { telegramHandle: { not: null } }] },
+      data: { phone: null, telegramHandle: null },
     }),
     prisma.rateLimitEvent.deleteMany({ where: { createdAt: { lt: pruneBefore } } }),
   ]);
@@ -82,7 +84,7 @@ export async function getListing(id: string): Promise<PublicListing | null> {
   return prisma.listing.findUnique({ where: { id }, select: PUBLIC_LISTING_SELECT });
 }
 
-function listingCreator(item: CreateListingItemInput, phone: string, batchToken: string) {
+function listingCreator(item: CreateListingItemInput, contact: Contact, batchToken: string) {
   return prisma.listing.create({
     data: {
       venueId: item.venueId,
@@ -93,7 +95,8 @@ function listingCreator(item: CreateListingItemInput, phone: string, batchToken:
       endTime: item.endTime,
       priceCents: item.priceCents,
       notes: item.notes,
-      phone,
+      phone: contact.phone,
+      telegramHandle: contact.telegramHandle,
       batchToken,
     },
     select: { id: true },
@@ -103,33 +106,36 @@ function listingCreator(item: CreateListingItemInput, phone: string, batchToken:
 /** Creates every item under one shared batchToken — the manage link for all of them. */
 export async function createListingBatch(
   items: CreateListingItemInput[],
-  phone: string,
+  contact: Contact,
 ): Promise<{ batchToken: string; ids: string[] }> {
-  const active = await prisma.listing.count({ where: { phone, status: "AVAILABLE" } });
+  const active = await prisma.listing.count({ where: { ...contactWhere(contact), status: "AVAILABLE" } });
   assertUnderActiveCap(active, items.length);
 
   const batchToken = newBatchToken();
-  const ids = await createBatch(items.map((item) => listingCreator(item, phone, batchToken)));
+  const ids = await createBatch(items.map((item) => listingCreator(item, contact, batchToken)));
   return { batchToken, ids };
 }
 
-/** Appends more listings to an existing manage link, reusing its phone. Null if the token is unknown or scrubbed. */
+/** Appends more listings to an existing manage link, reusing its contact info. Null if the token is unknown or scrubbed. */
 export async function addListingsToBatch(
   batchToken: string,
   items: CreateListingItemInput[],
 ): Promise<{ ids: string[] } | null> {
-  const existing = await prisma.listing.findFirst({ where: { batchToken }, select: { phone: true } });
-  if (!existing?.phone) return null;
-  const phone = existing.phone;
+  const existing = await prisma.listing.findFirst({
+    where: { batchToken }, select: { phone: true, telegramHandle: true },
+  });
+  if (!existing || (!existing.phone && !existing.telegramHandle)) return null;
+  const contact: Contact = { phone: existing.phone ?? undefined, telegramHandle: existing.telegramHandle ?? undefined };
 
-  const active = await prisma.listing.count({ where: { phone, status: "AVAILABLE" } });
+  const active = await prisma.listing.count({ where: { ...contactWhere(contact), status: "AVAILABLE" } });
   assertUnderActiveCap(active, items.length);
 
-  const ids = await createBatch(items.map((item) => listingCreator(item, phone, batchToken)));
+  const ids = await createBatch(items.map((item) => listingCreator(item, contact, batchToken)));
   return { ids };
 }
 
-export async function revealListingPhone(id: string): Promise<string | null> {
-  const row = await prisma.listing.findUnique({ where: { id }, select: { phone: true } });
-  return row?.phone ?? null;
+export async function revealListingContact(id: string): Promise<Contact | null> {
+  const row = await prisma.listing.findUnique({ where: { id }, select: { phone: true, telegramHandle: true } });
+  if (!row) return null;
+  return { phone: row.phone ?? undefined, telegramHandle: row.telegramHandle ?? undefined };
 }

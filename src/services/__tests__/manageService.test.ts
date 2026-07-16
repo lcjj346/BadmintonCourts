@@ -28,8 +28,8 @@ function sessionItem(venueId: string, over: Record<string, unknown> = {}) {
 describe("manageService", () => {
   it("finds either post type by batch token; empty for unknown", async () => {
     const venue = await makeVenue();
-    const l = await createListingBatch([listingItem(venue.id)] as never, "+6591234567");
-    const s = await createSessionBatch([sessionItem(venue.id)] as never, "+6581234567");
+    const l = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
+    const s = await createSessionBatch([sessionItem(venue.id)] as never, { phone: "+6581234567" });
 
     expect((await findPostsByBatchToken(l.batchToken))[0]?.type).toBe("listing");
     expect((await findPostsByBatchToken(s.batchToken))[0]?.type).toBe("session");
@@ -40,14 +40,14 @@ describe("manageService", () => {
     const venue = await makeVenue();
     const { batchToken } = await createListingBatch(
       [listingItem(venue.id), listingItem(venue.id, { startTime: "18:00", endTime: "20:00" })] as never,
-      "+6591234567",
+      { phone: "+6591234567" },
     );
     expect(await findPostsByBatchToken(batchToken)).toHaveLength(2);
   });
 
   it("closes: listing → SOLD, session → FILLED", async () => {
     const venue = await makeVenue();
-    const l = await createListingBatch([listingItem(venue.id)] as never, "+6591234567");
+    const l = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
     const [{ post }] = await findPostsByBatchToken(l.batchToken);
     expect(await closePost(l.batchToken, "listing", post.id)).toBe(true);
     expect((await prisma.listing.findFirstOrThrow()).status).toBe("SOLD");
@@ -56,7 +56,7 @@ describe("manageService", () => {
 
   it("closes a session by token → FILLED", async () => {
     const venue = await makeVenue();
-    const s = await createSessionBatch([sessionItem(venue.id)] as never, "+6581234567");
+    const s = await createSessionBatch([sessionItem(venue.id)] as never, { phone: "+6581234567" });
     const [{ post }] = await findPostsByBatchToken(s.batchToken);
     expect(await closePost(s.batchToken, "session", post.id)).toBe(true);
     expect((await prisma.gameSession.findFirstOrThrow()).status).toBe("FILLED");
@@ -64,8 +64,8 @@ describe("manageService", () => {
 
   it("a token can't act on a row from a different batch", async () => {
     const venue = await makeVenue();
-    const a = await createListingBatch([listingItem(venue.id)] as never, "+6591234567");
-    const b = await createListingBatch([listingItem(venue.id)] as never, "+6581234567");
+    const a = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
+    const b = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6581234567" });
     const [{ post }] = await findPostsByBatchToken(a.batchToken);
     expect(await closePost(b.batchToken, "listing", post.id)).toBe(false);
     expect((await prisma.listing.findUniqueOrThrow({ where: { id: post.id } })).status).toBe("AVAILABLE");
@@ -73,7 +73,7 @@ describe("manageService", () => {
 
   it("deletes by token", async () => {
     const venue = await makeVenue();
-    const l = await createListingBatch([listingItem(venue.id)] as never, "+6591234567");
+    const l = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
     const [{ post }] = await findPostsByBatchToken(l.batchToken);
     expect(await deletePost(l.batchToken, "listing", post.id)).toBe(true);
     expect(await prisma.listing.count()).toBe(0);
@@ -81,7 +81,7 @@ describe("manageService", () => {
 
   it("deletes a session by token", async () => {
     const venue = await makeVenue();
-    const s = await createSessionBatch([sessionItem(venue.id)] as never, "+6581234567");
+    const s = await createSessionBatch([sessionItem(venue.id)] as never, { phone: "+6581234567" });
     const [{ post }] = await findPostsByBatchToken(s.batchToken);
     expect(await deletePost(s.batchToken, "session", post.id)).toBe(true);
     expect(await prisma.gameSession.count()).toBe(0);
@@ -89,13 +89,13 @@ describe("manageService", () => {
 
   it("findPostsByBatchToken returns playersNeeded for sessions", async () => {
     const venue = await makeVenue();
-    const s = await createSessionBatch([sessionItem(venue.id, { playersNeeded: 3 })] as never, "+6581234567");
+    const s = await createSessionBatch([sessionItem(venue.id, { playersNeeded: 3 })] as never, { phone: "+6581234567" });
     expect((await findPostsByBatchToken(s.batchToken))[0]?.post.playersNeeded).toBe(3);
   });
 
   it("updatePlayersNeeded updates a session and returns true", async () => {
     const venue = await makeVenue();
-    const s = await createSessionBatch([sessionItem(venue.id)] as never, "+6581234567");
+    const s = await createSessionBatch([sessionItem(venue.id)] as never, { phone: "+6581234567" });
     const [{ post }] = await findPostsByBatchToken(s.batchToken);
     expect(await updatePlayersNeeded(s.batchToken, post.id, 5)).toBe(true);
     expect((await prisma.gameSession.findFirstOrThrow()).playersNeeded).toBe(5);
@@ -103,7 +103,7 @@ describe("manageService", () => {
 
   it("updatePlayersNeeded returns false for a listing and for an unknown token", async () => {
     const venue = await makeVenue();
-    const l = await createListingBatch([listingItem(venue.id)] as never, "+6591234567");
+    const l = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
     const [{ post }] = await findPostsByBatchToken(l.batchToken);
     expect(await updatePlayersNeeded(l.batchToken, post.id, 5)).toBe(false);
     expect(await updatePlayersNeeded("00000000-0000-0000-0000-000000000000", post.id, 5)).toBe(false);
@@ -111,7 +111,7 @@ describe("manageService", () => {
 
   it("editListing updates date/time/price/notes", async () => {
     const venue = await makeVenue();
-    const l = await createListingBatch([listingItem(venue.id)] as never, "+6591234567");
+    const l = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
     const [{ post }] = await findPostsByBatchToken(l.batchToken);
     const ok = await editListing(l.batchToken, post.id, {
       date: todaySgt(), startTime: "09:00", endTime: "11:00", priceCents: 2000, notes: "updated",
@@ -125,7 +125,7 @@ describe("manageService", () => {
 
   it("editSession updates time/skill/players/notes", async () => {
     const venue = await makeVenue();
-    const s = await createSessionBatch([sessionItem(venue.id)] as never, "+6581234567");
+    const s = await createSessionBatch([sessionItem(venue.id)] as never, { phone: "+6581234567" });
     const [{ post }] = await findPostsByBatchToken(s.batchToken);
     const ok = await editSession(s.batchToken, post.id, {
       date: todaySgt(), startTime: "19:00", endTime: "21:00", playersNeeded: 4,
