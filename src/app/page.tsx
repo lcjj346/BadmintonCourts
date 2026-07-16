@@ -58,7 +58,7 @@ export default async function BoardPage({
   return (
     <main>
       <header className="flex items-center justify-between pt-4">
-        <h1 className="text-lg font-bold">🏸 BadmintonSG</h1>
+        <h1 className="text-lg font-bold">BadmintonSG</h1>
         <div className="flex items-center gap-3">
           <OnlineCount />
           <Link href="/faq" className="text-sm font-medium text-court underline">

@@ -18,7 +18,7 @@ describe("manageService", () => {
     });
     const s = await createSession({
       venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
-      playersNeeded: 2, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
+      playersNeeded: 2, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
     });
 
     expect((await findPostByToken(l.editToken))?.type).toBe("listing");
@@ -42,7 +42,7 @@ describe("manageService", () => {
     const venue = await makeVenue();
     const s = await createSession({
       venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
-      playersNeeded: 2, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
+      playersNeeded: 2, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
     });
     expect(await closePostByToken(s.editToken)).toBe(true);
     const row = await prisma.gameSession.findFirstOrThrow();
@@ -63,7 +63,7 @@ describe("manageService", () => {
     const venue = await makeVenue();
     const s = await createSession({
       venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
-      playersNeeded: 3, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
+      playersNeeded: 3, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
     });
     expect((await findPostByToken(s.editToken))?.post.playersNeeded).toBe(3);
   });
@@ -72,7 +72,7 @@ describe("manageService", () => {
     const venue = await makeVenue();
     const s = await createSession({
       venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
-      playersNeeded: 2, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
+      playersNeeded: 2, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
     });
     expect(await updatePlayersNeeded(s.editToken, 5)).toBe(true);
     expect((await prisma.gameSession.findFirstOrThrow()).playersNeeded).toBe(5);
@@ -92,7 +92,7 @@ describe("manageService", () => {
     const venue = await makeVenue();
     const s = await createSession({
       venueId: venue.id, date: todaySgt(), startTime: "18:00", endTime: "20:00",
-      playersNeeded: 2, skillLevel: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
+      playersNeeded: 2, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null, phone: "+6581234567",
     });
     expect(await deletePostByToken(s.editToken)).toBe(true);
     expect(await prisma.gameSession.count()).toBe(0);

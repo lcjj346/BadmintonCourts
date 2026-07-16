@@ -40,7 +40,7 @@ export function DateStrip() {
     }`;
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto py-2">
+    <div className="flex items-center gap-2 overflow-x-auto pb-3 pt-3">
       <button
         type="button"
         onClick={openPicker}

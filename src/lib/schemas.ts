@@ -59,14 +59,21 @@ export const createListingSchema = postBase
   .refine(timeOrder, TIME_ORDER_MSG)
   .refine(futureStartToday, FUTURE_START_MSG);
 
+const skillIndex = (s: (typeof SKILL_LEVELS)[number]) => SKILL_LEVELS.indexOf(s);
+const skillOrder = (v: { skillMin: (typeof SKILL_LEVELS)[number]; skillMax: (typeof SKILL_LEVELS)[number] }) =>
+  skillIndex(v.skillMax) >= skillIndex(v.skillMin);
+const SKILL_ORDER_MSG = { message: "Max skill must be the same as or higher than min skill", path: ["skillMax"] };
+
 export const createSessionSchema = postBase
   .extend({
     playersNeeded: z.number().int().min(1).max(50),
-    skillLevel: z.enum(SKILL_LEVELS),
+    skillMin: z.enum(SKILL_LEVELS),
+    skillMax: z.enum(SKILL_LEVELS),
     pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),
   })
   .refine(timeOrder, TIME_ORDER_MSG)
-  .refine(futureStartToday, FUTURE_START_MSG);
+  .refine(futureStartToday, FUTURE_START_MSG)
+  .refine(skillOrder, SKILL_ORDER_MSG);
 
 // Each field falls back to undefined (no filter) on an invalid value, so a stale or
 // hand-edited URL degrades gracefully instead of blanking the whole board.

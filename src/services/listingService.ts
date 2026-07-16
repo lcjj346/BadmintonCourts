@@ -26,7 +26,7 @@ const DAY_MS = 24 * 3600 * 1000;
 export async function sweepExpired(): Promise<void> {
   const today = strToDate(todaySgt());
   const now = nowSgtTime();
-  const scrubBefore = new Date(today.getTime() - 7 * DAY_MS);
+  const scrubBefore = new Date(today.getTime() - 14 * DAY_MS);
   const pruneBefore = new Date(Date.now() - DAY_MS);
 
   // A slot expires once its start time passes: past dates, or today with startTime <= now (SGT).

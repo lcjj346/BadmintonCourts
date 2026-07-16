@@ -28,6 +28,25 @@ number to call". No sign-up friction, no login, used courtside on a phone.
 
 ---
 
+## Screenshots
+
+<table>
+<tr>
+<td><img src="docs/screenshots/board-courts.png" width="220" alt="Courts board, grouped by date"></td>
+<td><img src="docs/screenshots/board-players.png" width="220" alt="Players board, with skill level and players needed"></td>
+<td><img src="docs/screenshots/post-court.png" width="220" alt="Post a court slot form"></td>
+<td><img src="docs/screenshots/faq.png" width="220" alt="FAQ page"></td>
+</tr>
+<tr>
+<td align="center">Courts board</td>
+<td align="center">Players board</td>
+<td align="center">Post a court</td>
+<td align="center">FAQ</td>
+</tr>
+</table>
+
+---
+
 ## Tech stack
 
 | Layer | Choice | Why |
@@ -35,13 +54,13 @@ number to call". No sign-up friction, no login, used courtside on a phone.
 | Framework | **Next.js 15** (App Router) | Server components for the board (fast, SEO-able), route handlers for the API, one deploy target |
 | Language | **TypeScript** (strict) | Type-safe end to end; `npx tsc --noEmit` is a required gate |
 | Styling | **Tailwind CSS v4** | Utility-first, mobile-first; custom tokens `court`/`court-light`/`paper` |
-| ORM / DB | **Prisma 6 + PostgreSQL** (Supabase) | Typed queries, migrations; Postgres-backed rate limiting (no Redis) |
+| ORM / DB | **Prisma 6 + PostgreSQL** (Neon) | Typed queries, migrations; Postgres-backed rate limiting (no Redis) |
 | Validation | **Zod** | One schema layer for API input **and** environment variables |
 | Dates/time | **dayjs** (utc + timezone) | Confined to `src/lib/time.ts`; all court times are SGT wall-clock |
 | Logging | **Pino** | JSON logs to stdout with `phone`/`editToken`/`url` redaction |
 | Tests | **Jest + React Testing Library + Playwright** | Unit + component + one end-to-end core-loop |
 | Analytics | **Vercel Analytics** | Free, privacy-light traffic measurement |
-| Hosting | **Vercel + Supabase** | Both free tiers cover ~1,000 users/day at $0/mo |
+| Hosting | **Vercel + Neon** | Both free tiers cover ~1,000 users/day at $0/mo; Neon auto-wakes on query, no manual resume |
 
 ```mermaid
 flowchart LR
@@ -52,7 +71,7 @@ flowchart LR
     end
     subgraph data ["🗄️ Data"]
         PRISMA["Prisma 6"]
-        PG["PostgreSQL<br/>Supabase"]
+        PG["PostgreSQL<br/>Neon"]
         ZOD["Zod<br/>input + env validation"]
     end
     subgraph quality ["✅ Quality"]
@@ -90,14 +109,14 @@ flowchart TD
         PC["Prisma client singleton<br/>src/lib/db.ts"]
     end
 
-    DB[("PostgreSQL · Supabase<br/>Venue · Listing · GameSession<br/>RateLimitEvent · ReportFlag · VenueSuggestion")]
+    DB[("PostgreSQL · Neon<br/>Venue · Listing · GameSession<br/>RateLimitEvent · ReportFlag · VenueSuggestion")]
 
     B -->|"page navigation"| SC
     B -->|"fetch() — post, reveal, report"| RH
     RH --> ZOD --> SVC
     SC -->|"reads via PUBLIC_SELECT<br/>(phone + editToken omitted)"| SVC
     SVC --> PC
-    PC -->|"pooled connection (pgbouncer)"| DB
+    PC -->|"pooled connection (Neon pooler)"| DB
 
     style SVC fill:#dcfce7,stroke:#14532d,color:#14532d
     style DB fill:#f0fdf4,stroke:#14532d,color:#14532d
@@ -160,7 +179,7 @@ sequenceDiagram
     actor S as Seller
     actor B as Buyer
     participant App as Next.js on Vercel
-    participant DB as Postgres on Supabase
+    participant DB as Postgres on Neon
 
     Note over S,DB: 1 · Post a court slot
     S->>App: POST /api/listings — venue, date, time, price, phone
@@ -224,7 +243,7 @@ imports dayjs). `createdAt`/`updatedAt` remain normal UTC machine timestamps.
 - **Anti-spam** — hidden honeypot field (a filled `website` field silently returns success
   and writes nothing), SG phone validation (`/^[89]\d{7}$/`), max 5 active posts per phone.
 - **PDPA-minded** — IPs are stored only as salted SHA-256 hashes; phone numbers are scrubbed
-  7 days after a post expires; the footer states exactly what's retained.
+  14 days after a post expires; the footer states exactly what's retained.
 - **Manage links** — unguessable UUID tokens, `noindex` meta + `X-Robots-Tag` header, and
   Pino redaction so tokens/phones never hit logs.
 - No `dangerouslySetInnerHTML` anywhere; Prisma parameterises all queries.
@@ -253,15 +272,15 @@ npx prisma db seed
 npm run dev                   # http://localhost:3000
 ```
 
-No Docker? Point `DATABASE_URL`/`DIRECT_URL` in `.env` at any Postgres (e.g. a free Supabase
-project) and skip step 2.
+No Docker? Point `DATABASE_URL`/`DIRECT_URL` in `.env` at any Postgres (e.g. a free
+[Neon](https://neon.tech) project) and skip step 2.
 
 ### Environment variables (`.env`)
 
 | Var | Purpose |
 |---|---|
-| `DATABASE_URL` | Postgres connection. In production: Supabase **pooled** string (port 6543) + `?pgbouncer=true&connection_limit=1` |
-| `DIRECT_URL` | Direct Postgres connection (port 5432) — used by Prisma for migrations |
+| `DATABASE_URL` | Postgres connection. In production: Neon's **pooled** connection string (host ends in `-pooler`) |
+| `DIRECT_URL` | Neon's **direct** connection string (host has no `-pooler` suffix) — used by Prisma for migrations |
 | `IP_HASH_SALT` | Secret salt for hashing IPs. Generate a fresh one for production: `openssl rand -hex 32` |
 
 `src/lib/env.ts` validates these with Zod at startup, so a missing/malformed var fails fast.
@@ -279,17 +298,18 @@ npm run lint         # ESLint
 
 ---
 
-## Deployment (Vercel + Supabase)
+## Deployment (Vercel + Neon)
 
-At ~1,000 users/day both free tiers are comfortable (**~$0/month**). The one non-obvious
-requirement is Supabase connection pooling — serverless functions exhaust direct connections
-otherwise.
+At ~1,000 users/day both free tiers are comfortable (**~$0/month**). Neon auto-suspends
+compute after a few minutes of inactivity and wakes itself on the next query — no manual
+"resume" step, unlike Supabase's 7-day pause.
 
-1. **Create a Supabase project** (region `ap-southeast-1` / Singapore). From
-   **Settings → Database**, copy two connection strings:
-   - **Pooled** (Transaction mode, port **6543**) → production `DATABASE_URL`, and append
-     `?pgbouncer=true&connection_limit=1`.
-   - **Direct** (port **5432**) → production `DIRECT_URL`.
+1. **Create a Neon project** (region `ap-southeast-1` / Singapore, if available — otherwise
+   the nearest region to your users). From the project dashboard, copy two connection strings:
+   - **Pooled connection** (host ends in `-pooler.<region>.aws.neon.tech`) → production
+     `DATABASE_URL`.
+   - **Direct connection** (same host, no `-pooler`) → production `DIRECT_URL`, used by Prisma
+     for migrations.
 2. **Apply schema + seed** against production (run once locally with the prod vars set):
    ```bash
    npx prisma migrate deploy
@@ -302,7 +322,7 @@ otherwise.
    it sold, delete it. Confirm `/api/listings` responses contain no `phone` field.
 
 > Vercel's Hobby tier is non-commercial — fine while the app is free to use. Growth triggers:
-> Supabase Pro ($25) then Vercel Pro ($20), at roughly 10× traffic.
+> Neon's paid tier (usage-based, from ~$5) then Vercel Pro ($20), at roughly 10× traffic.
 
 ---
 

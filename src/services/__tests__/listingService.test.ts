@@ -61,7 +61,7 @@ describe("listingService", () => {
     const venue = await makeVenue();
     const { id: oldId } = await createListing(input(venue.id));
     const { id: veryOldId } = await createListing(input(venue.id, { phone: "+6581111111" }));
-    // Backdate relative to todaySgt(): 3 days past (<7d, kept) and 40 days past (>7d, scrubbed).
+    // Backdate relative to todaySgt(): 3 days past (<14d, kept) and 40 days past (>14d, scrubbed).
     const oldDate = dayjs(todaySgt()).subtract(3, "day").format("YYYY-MM-DD");
     const veryOldDate = dayjs(todaySgt()).subtract(40, "day").format("YYYY-MM-DD");
     // Backdate via raw update (service forbids past dates at create time)
@@ -72,10 +72,10 @@ describe("listingService", () => {
 
     const old = await prisma.listing.findUniqueOrThrow({ where: { id: oldId } });
     expect(old.status).toBe("EXPIRED");
-    expect(old.phone).toBe("+6591234567"); // <7 days past: kept
+    expect(old.phone).toBe("+6591234567"); // <14 days past: kept
     const veryOld = await prisma.listing.findUniqueOrThrow({ where: { id: veryOldId } });
     expect(veryOld.status).toBe("EXPIRED");
-    expect(veryOld.phone).toBeNull(); // >7 days past: scrubbed
+    expect(veryOld.phone).toBeNull(); // >14 days past: scrubbed
   });
 
   it("sweep expires a same-day slot once its start time has passed", async () => {

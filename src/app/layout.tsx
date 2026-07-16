@@ -46,7 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <main className="mx-auto max-w-md px-4 pb-24 pt-4 md:max-w-3xl lg:max-w-5xl">{children}</main>
         <footer className="mx-auto max-w-md px-4 pb-6 text-center text-xs text-gray-400 md:max-w-3xl lg:max-w-5xl">
           <p>
-            We store only your post details and phone number, and delete numbers 7 days after a
+            We store only your post details and phone number, and delete numbers 14 days after a
             post expires. IPs are stored hashed, for rate limiting only.
           </p>
         </footer>

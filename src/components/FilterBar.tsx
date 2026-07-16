@@ -78,7 +78,7 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
   const applyDisabled = toSel <= fromSel;
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2">
+    <div className="flex gap-2 overflow-x-auto pb-3">
       {chip("Region", region, "region", "region")}
       {chip("Venue", venueName ?? null, "venue", "venueId")}
 

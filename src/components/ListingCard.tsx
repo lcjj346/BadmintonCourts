@@ -38,7 +38,7 @@ export function ListingCard({ listing }: { listing: PublicListing }) {
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <span className="rounded-lg bg-court-light px-2.5 py-1 text-[15px] font-bold text-court">
+          <span className="whitespace-nowrap rounded-lg bg-court-light px-2.5 py-1 text-[15px] font-bold text-court">
             {formatPrice(listing.priceCents)}
           </span>
           {claimed && <StatusBadge status={listing.status} />}

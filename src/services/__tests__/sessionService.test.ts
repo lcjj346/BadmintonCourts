@@ -13,7 +13,7 @@ const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
 
 const input = (venueId: string, over: Record<string, unknown> = {}) => ({
   venueId, date: tomorrow, startTime: "18:00", endTime: "20:00",
-  playersNeeded: 2, skillLevel: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
+  playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
   phone: "+6591234567", ...over,
 }) as Parameters<typeof createSession>[0];
 
@@ -24,16 +24,26 @@ describe("sessionService", () => {
     const rows = await listSessions({});
     expect(rows).toHaveLength(1);
     expect(rows[0].playersNeeded).toBe(2);
-    expect(rows[0].skillLevel).toBe("MID_INTERMEDIATE");
+    expect(rows[0].skillMin).toBe("MID_INTERMEDIATE");
+    expect(rows[0].skillMax).toBe("MID_INTERMEDIATE");
     expect(rows[0]).not.toHaveProperty("phone");
     expect(rows[0]).not.toHaveProperty("editToken");
   });
 
-  it("filters by skill", async () => {
+  it("filters by skill (exact)", async () => {
     const venue = await makeVenue();
     await createSession(input(venue.id));
-    await createSession(input(venue.id, { skillLevel: "LOW_BEGINNER", phone: "+6581234567" }));
+    await createSession(input(venue.id, { skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", phone: "+6581234567" }));
     expect(await listSessions({ skill: "LOW_BEGINNER" })).toHaveLength(1);
+  });
+
+  it("filters by skill within a range", async () => {
+    const venue = await makeVenue();
+    await createSession(input(venue.id, { skillMin: "MID_BEGINNER", skillMax: "LOW_INTERMEDIATE" }));
+    await createSession(input(venue.id, { skillMin: "ADVANCED", skillMax: "ADVANCED", phone: "+6581234567" }));
+    const rows = await listSessions({ skill: "HIGH_BEGINNER" });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].skillMin).toBe("MID_BEGINNER");
   });
 
   it("filters by time range", async () => {

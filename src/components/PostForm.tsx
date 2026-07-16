@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/BottomSheet";
 import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
 import { todaySgt, maxPostDateSgt, nowSgtTime, TIME_OPTIONS, addHoursToTime } from "@/lib/time";
-import { SKILL_OPTIONS, PLAYER_COUNT_OPTIONS } from "@/lib/skill";
+import { SKILL_OPTIONS, SKILL_ORDER, PLAYER_COUNT_OPTIONS, type SkillLevel } from "@/lib/skill";
 
 const COUNTRY_CODES: [string, string][] = [
   ["+65", "SG"], ["+60", "MY"], ["+62", "ID"], ["+63", "PH"], ["+66", "TH"],
@@ -23,7 +23,8 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
   const [price, setPrice] = useState(""); // dollars string; "" → negotiable
   const [free, setFree] = useState(false);
   const [playersNeeded, setPlayersNeeded] = useState(2);
-  const [skillLevel, setSkillLevel] = useState("MID_INTERMEDIATE");
+  const [skillMin, setSkillMin] = useState<SkillLevel>("MID_INTERMEDIATE");
+  const [skillMax, setSkillMax] = useState<SkillLevel>("MID_INTERMEDIATE");
   const [notes, setNotes] = useState("");
   const [countryCode, setCountryCode] = useState("+65");
   const [phone, setPhone] = useState("");
@@ -71,7 +72,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       kind === "court"
         ? { venueId, date, startTime, endTime, priceCents: cents, notes: notes || undefined, phone: e164, website: "" }
         : {
-            venueId, date, startTime, endTime, playersNeeded, skillLevel,
+            venueId, date, startTime, endTime, playersNeeded, skillMin, skillMax,
             pricePerPlayerCents: cents, notes: notes || undefined, phone: e164, website: "",
           };
 
@@ -166,16 +167,43 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
             ))}
           </select>
           <label className={label}>Skill level</label>
-          <select
-            className={input}
-            aria-label="Skill level"
-            value={skillLevel}
-            onChange={(e) => setSkillLevel(e.target.value)}
-          >
-            {SKILL_OPTIONS.map(([value, text]) => (
-              <option key={value} value={value}>{text}</option>
-            ))}
-          </select>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <span className="mb-1 block text-xs text-gray-400">From</span>
+              <select
+                className={input}
+                aria-label="Skill level from"
+                value={skillMin}
+                onChange={(e) => {
+                  const next = e.target.value as SkillLevel;
+                  setSkillMin(next);
+                  if (SKILL_ORDER.indexOf(next) > SKILL_ORDER.indexOf(skillMax)) setSkillMax(next);
+                }}
+              >
+                {SKILL_OPTIONS.map(([value, text]) => (
+                  <option key={value} value={value}>{text}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1">
+              <span className="mb-1 block text-xs text-gray-400">To</span>
+              <select
+                className={input}
+                aria-label="Skill level to"
+                value={skillMax}
+                onChange={(e) => setSkillMax(e.target.value as SkillLevel)}
+              >
+                {SKILL_OPTIONS.filter(([value]) => SKILL_ORDER.indexOf(value) >= SKILL_ORDER.indexOf(skillMin)).map(
+                  ([value, text]) => (
+                    <option key={value} value={value}>{text}</option>
+                  ),
+                )}
+              </select>
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            Same level both ends for a single skill, or a range like Mid Beginner–Low Intermediate.
+          </p>
         </>
       )}
 
@@ -229,7 +257,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
         />
       </div>
       <p className="mt-1 text-xs text-gray-400">
-        Shown only to people who tap &quot;Reveal contact&quot;. Deleted 7 days after your post expires.
+        Shown only to people who tap &quot;Reveal contact&quot;. Deleted 14 days after your post expires.
       </p>
 
       {/* honeypot — hidden from real users */}
@@ -238,7 +266,7 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       <div className="mt-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
-        📌 After posting you&apos;ll get a <strong>private manage link</strong> — it&apos;s the only
+        After posting you&apos;ll get a <strong>private manage link</strong> — it&apos;s the only
         way to edit players needed, mark as sold/filled, or delete your post. Save it before sharing
         your court.
       </div>

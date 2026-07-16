@@ -67,7 +67,7 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
   await page.getByLabel("Date").fill(tomorrowSgt());
-  await page.getByLabel("Skill level").selectOption("ADVANCED");
+  await page.getByLabel("Skill level from").selectOption("ADVANCED");
   await page.getByPlaceholder("9123 4567").fill("81234567");
   await page.getByRole("button", { name: /post game/i }).click();
 

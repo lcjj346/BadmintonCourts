@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { PublicSession } from "@/services/sessionService";
 import { formatPrice } from "@/lib/time";
 import { StatusBadge } from "@/components/StatusBadge";
-import { SKILL_LABELS } from "@/lib/skill";
+import { skillRangeLabel } from "@/lib/skill";
 
 export function SessionCard({ session }: { session: PublicSession }) {
   const filled = session.status !== "OPEN";
@@ -34,7 +34,7 @@ export function SessionCard({ session }: { session: PublicSession }) {
           <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-court-light/70 px-2 py-0.5 text-[11px] font-semibold text-court">
             <span className="tabular-nums">Needs {session.playersNeeded}</span>
             <span className="text-court/40">·</span>
-            <span>{SKILL_LABELS[session.skillLevel]}</span>
+            <span>{skillRangeLabel(session.skillMin, session.skillMax)}</span>
           </div>
           {session.venue.availabilityNote && (
             <div className="mt-1.5 flex items-start gap-1 text-xs text-amber-700">
@@ -44,7 +44,7 @@ export function SessionCard({ session }: { session: PublicSession }) {
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <span className="rounded-lg bg-court-light px-2.5 py-1 text-[15px] font-bold text-court">
+          <span className="whitespace-nowrap rounded-lg bg-court-light px-2.5 py-1 text-[15px] font-bold text-court">
             {formatPrice(session.pricePerPlayerCents)}
             {session.pricePerPlayerCents !== null && session.pricePerPlayerCents > 0 && (
               <span className="text-[10px] font-normal text-court/50">/pax</span>

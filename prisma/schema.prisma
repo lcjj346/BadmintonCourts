@@ -90,7 +90,8 @@ model GameSession {
   startTime           String
   endTime             String
   playersNeeded       Int
-  skillLevel          SkillLevel
+  skillMin            SkillLevel
+  skillMax            SkillLevel
   pricePerPlayerCents Int?                // 0 = free, null = split/negotiable
   notes               String?
   phone               String?             // same scrubbing + select rules as Listing

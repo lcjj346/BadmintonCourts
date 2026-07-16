@@ -52,7 +52,7 @@ export default function FaqPage() {
             A post stays visible until its start time passes, then it expires automatically.
             Sold or filled posts remain visible (with a badge) until their start time passes.
           </p>
-          <p>Phone numbers are permanently deleted 7 days after a post expires.</p>
+          <p>Phone numbers are permanently deleted 14 days after a post expires.</p>
         </Card>
 
         <Card title="How do I edit, mark sold/filled, or delete my post?">
@@ -63,7 +63,7 @@ export default function FaqPage() {
           </p>
           <p>
             If you lose it you can&apos;t edit the post, but it expires by itself after the date, and
-            the number is scrubbed 7 days later.
+            the number is scrubbed 14 days later.
           </p>
         </Card>
 
@@ -84,7 +84,7 @@ export default function FaqPage() {
             rate-limited &quot;Reveal contact&quot; button.
           </p>
           <p>
-            It&apos;s deleted 7 days after your post expires, and IP addresses are stored only as
+            It&apos;s deleted 14 days after your post expires, and IP addresses are stored only as
             salted hashes for rate limiting. SG (+65), MY (+60) and other regional numbers supported.
           </p>
         </Card>
