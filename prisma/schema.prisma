@@ -49,6 +49,7 @@ enum RateAction {
   REVEAL
   CREATE
   REPORT
+  PRESENCE
 }
 
 model Venue {

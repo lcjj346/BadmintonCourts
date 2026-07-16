@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/db";
 import { resetDb } from "@/lib/__tests__/helpers/db";
 import {
-  assertCreateAllowed, assertRevealAllowed, recordCreate, RateLimitError,
+  assertCreateAllowed, assertRevealAllowed, assertPresenceAllowed, recordCreate, RateLimitError,
 } from "@/services/rateLimitService";
 
 beforeEach(resetDb);
@@ -28,6 +28,12 @@ describe("rateLimitService", () => {
   it("blocks after 30 reveals across targets in an hour", async () => {
     for (let i = 0; i < 30; i++) await assertRevealAllowed("hashA", `t${i}`);
     await expect(assertRevealAllowed("hashA", "t99")).rejects.toThrow(RateLimitError);
+  });
+
+  it("allows 300 presence pings then blocks the 301st", async () => {
+    for (let i = 0; i < 300; i++) await assertPresenceAllowed("hashA");
+    await expect(assertPresenceAllowed("hashA")).rejects.toThrow(RateLimitError);
+    await expect(assertPresenceAllowed("hashB")).resolves.toBeUndefined();
   });
 
   it("ignores events outside the window", async () => {
