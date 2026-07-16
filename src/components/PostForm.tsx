@@ -72,6 +72,7 @@ export function PostForm({
   const [venueSheetFor, setVenueSheetFor] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState("+65");
   const [phone, setPhone] = useState("");
+  const [telegramHandle, setTelegramHandle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -112,6 +113,9 @@ export function PostForm({
         return setError("One of your slots' start times has already passed — pick a later time or another day");
       }
     }
+    if (!batchToken && !phone.trim() && !telegramHandle.trim()) {
+      return setError("Enter a phone number or a Telegram handle");
+    }
     setSubmitting(true);
 
     const items = entries.map((entry) => {
@@ -141,7 +145,13 @@ export function PostForm({
         : (() => {
             let local = phone.replace(/\D/g, "");
             if (countryCode !== "+65") local = local.replace(/^0/, "");
-            return { items, phone: `${countryCode}${local}`, website: "" };
+            const handle = telegramHandle.trim().replace(/^@/, "");
+            return {
+              items,
+              phone: local ? `${countryCode}${local}` : undefined,
+              telegramHandle: handle || undefined,
+              website: "",
+            };
           })();
       const res = await fetch(url, {
         method: "POST",
@@ -425,12 +435,25 @@ export function PostForm({
               placeholder="9123 4567"
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/\s/g, ""))}
-              required
             />
           </div>
+
+          <label className={label} htmlFor="post-telegram">
+            Telegram handle {phone.trim() ? "(optional)" : ""}
+          </label>
+          <input
+            id="post-telegram"
+            className={input}
+            type="text"
+            placeholder="@username"
+            value={telegramHandle}
+            onChange={(e) => setTelegramHandle(e.target.value.replace(/\s/g, ""))}
+          />
+
           <p className="mt-1 text-xs text-gray-400">
-            Shown only to people who tap &quot;Reveal contact&quot;. Deleted 14 days after your post expires.
-            {entries.length > 1 && " One number for all the courts/games above."}
+            Enter a phone number, a Telegram handle, or both — shown only to people who tap
+            &quot;Reveal contact&quot;. Deleted 14 days after your post expires.
+            {entries.length > 1 && " Same contact for all the courts/games above."}
           </p>
 
           {/* honeypot — hidden from real users */}

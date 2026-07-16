@@ -20,6 +20,12 @@ const phoneSchema = z
     "Enter a valid mobile number with country code",
   );
 
+// Telegram's own username rules: 5-32 chars, letters/digits/underscores, starts with a letter.
+// A leading "@" is stripped before this runs (people type it either way).
+const telegramHandleSchema = z
+  .string()
+  .regex(/^[a-zA-Z][a-zA-Z0-9_]{4,31}$/, "Enter a valid Telegram username (5-32 characters)");
+
 const timeStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
 const dateInRange = z
@@ -97,17 +103,24 @@ const createSessionItemSchema = createSessionItemBase
   .refine(skillOrder, SKILL_ORDER_MSG)
   .refine(validVenueRef, VENUE_REF_MSG);
 
+// Phone and Telegram are both optional individually, but at least one is required —
+// enforced by the refine below, applied after items are attached so the error path
+// stays on "phone" for a clear top-of-form message.
 const batchEnvelope = z.object({
-  phone: phoneSchema,
+  phone: phoneSchema.optional(),
+  telegramHandle: telegramHandleSchema.optional(),
   website: honeypot, // honeypot: real users never see or fill this
 });
+const hasContact = (v: { phone?: string; telegramHandle?: string }) =>
+  Boolean(v.phone) || Boolean(v.telegramHandle);
+const CONTACT_MSG = { message: "Enter a phone number or a Telegram handle", path: ["phone"] };
 
-export const createListingSchema = batchEnvelope.extend({
-  items: z.array(createListingItemSchema).min(1).max(MAX_BATCH_ITEMS),
-});
-export const createSessionSchema = batchEnvelope.extend({
-  items: z.array(createSessionItemSchema).min(1).max(MAX_BATCH_ITEMS),
-});
+export const createListingSchema = batchEnvelope
+  .extend({ items: z.array(createListingItemSchema).min(1).max(MAX_BATCH_ITEMS) })
+  .refine(hasContact, CONTACT_MSG);
+export const createSessionSchema = batchEnvelope
+  .extend({ items: z.array(createSessionItemSchema).min(1).max(MAX_BATCH_ITEMS) })
+  .refine(hasContact, CONTACT_MSG);
 
 // --- Add-to-batch: appending more courts/games to an existing manage link. No phone —
 // the existing batch's phone is reused. ---

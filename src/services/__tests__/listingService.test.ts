@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { resetDb, makeVenue } from "@/lib/__tests__/helpers/db";
 import { todaySgt, strToDate } from "@/lib/time";
 import {
-  createListingBatch, listListings, getListing, revealListingPhone,
+  createListingBatch, listListings, getListing, revealListingContact,
   sweepExpired, ActivePostCapError,
 } from "@/services/listingService";
 
@@ -25,7 +25,7 @@ async function createListing(item: ReturnType<typeof input>) {
   const { phone, ...rest } = item;
   const { batchToken, ids } = await createListingBatch(
     [rest] as Parameters<typeof createListingBatch>[0],
-    phone as string,
+    { phone: phone as string },
   );
   return { id: ids[0], batchToken };
 }
@@ -53,7 +53,7 @@ describe("listingService", () => {
         date: tomorrow, startTime: "08:00", endTime: "10:00", priceCents: 1600,
         customVenueName: "Some Private Hall", customRegion: "EAST",
       }] as Parameters<typeof createListingBatch>[0],
-      "+6591234567",
+      { phone: "+6591234567" },
     );
     expect(batchToken).toMatch(/^[0-9a-f-]{36}$/);
 
@@ -132,7 +132,7 @@ describe("listingService", () => {
   it("reveal returns the phone", async () => {
     const venue = await makeVenue();
     const { id } = await createListing(input(venue.id));
-    expect(await revealListingPhone(id)).toBe("+6591234567");
+    expect(await revealListingContact(id)).toEqual({ phone: "+6591234567", telegramHandle: undefined });
   });
 
   it("with no date filter, returns all upcoming dates ordered by date then status then startTime", async () => {
@@ -154,7 +154,7 @@ describe("listingService", () => {
     const { phone, ...item } = input(venue.id);
     const { batchToken, ids } = await createListingBatch(
       [item, { ...item, startTime: "18:00", endTime: "20:00" }] as Parameters<typeof createListingBatch>[0],
-      phone as string,
+      { phone: phone as string },
     );
     expect(ids).toHaveLength(2);
     const rows = await prisma.listing.findMany({ where: { batchToken } });
@@ -166,7 +166,7 @@ describe("listingService", () => {
     const venue = await makeVenue();
     const { phone, ...item } = input(venue.id);
     const items = Array.from({ length: 6 }, () => item) as Parameters<typeof createListingBatch>[0];
-    await expect(createListingBatch(items, phone as string)).rejects.toThrow(ActivePostCapError);
+    await expect(createListingBatch(items, { phone: phone as string })).rejects.toThrow(ActivePostCapError);
   });
 
   it("with available=1, only AVAILABLE listings are returned", async () => {

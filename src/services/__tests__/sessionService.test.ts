@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/db";
 import { resetDb, makeVenue } from "@/lib/__tests__/helpers/db";
 import { todaySgt } from "@/lib/time";
-import { createSessionBatch, listSessions, revealSessionPhone } from "@/services/sessionService";
+import { createSessionBatch, listSessions, revealSessionContact } from "@/services/sessionService";
 
 beforeEach(resetDb);
 afterAll(() => prisma.$disconnect());
@@ -23,7 +23,7 @@ async function createSession(item: ReturnType<typeof input>) {
   const { phone, ...rest } = item;
   const { batchToken, ids } = await createSessionBatch(
     [rest] as Parameters<typeof createSessionBatch>[0],
-    phone as string,
+    { phone: phone as string },
   );
   return { id: ids[0], batchToken };
 }
@@ -46,7 +46,7 @@ describe("sessionService", () => {
     const { phone, ...item } = input(venue.id);
     const { batchToken, ids } = await createSessionBatch(
       [item, { ...item, startTime: "07:00", endTime: "09:00" }] as Parameters<typeof createSessionBatch>[0],
-      phone as string,
+      { phone: phone as string },
     );
     expect(ids).toHaveLength(2);
     const rows = await prisma.gameSession.findMany({ where: { batchToken } });
@@ -80,7 +80,7 @@ describe("sessionService", () => {
   it("reveals phone", async () => {
     const venue = await makeVenue();
     const { id } = await createSession(input(venue.id));
-    expect(await revealSessionPhone(id)).toBe("+6591234567");
+    expect(await revealSessionContact(id)).toEqual({ phone: "+6591234567", telegramHandle: undefined });
   });
 
   // Status ordering must dominate startTime ordering: an OPEN game always lists before a

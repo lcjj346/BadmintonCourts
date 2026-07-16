@@ -76,6 +76,7 @@ model Listing {
   priceCents      Int?                             // 0 = free, null = negotiable
   notes           String?
   phone           String?                          // nullable: scrubbed post-expiry (§7). NEVER in public selects
+  telegramHandle  String?                          // alternative to phone (at least one required) — same reveal/scrub rules
   status          ListingStatus @default(AVAILABLE)
   batchToken      String        @default(uuid())   // shared by every post created in the same submission — the manage-link secret
   createdAt       DateTime      @default(now())
@@ -101,6 +102,7 @@ model GameSession {
   pricePerPlayerCents Int?                // 0 = free, null = split/negotiable
   notes               String?
   phone               String?             // same scrubbing + select rules as Listing
+  telegramHandle      String?             // alternative to phone (at least one required)
   status              SessionStatus @default(OPEN)
   batchToken          String        @default(uuid())  // shared by every post created in the same submission — the manage-link secret
   createdAt           DateTime      @default(now())

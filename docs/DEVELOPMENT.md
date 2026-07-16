@@ -130,9 +130,10 @@ e2e-load/                    Playwright load test — opt-in only, see Testing
   "Weekends & school holidays only").
 - **Listing** (a court for sale) — venue OR customVenueName+customRegion (a venue not in our
   curated list — mutually exclusive, enforced by the create schema), date, start/end time,
-  priceCents (`0`=free, `null`=negotiable), notes, **phone**, status (AVAILABLE/SOLD/EXPIRED),
-  and a **batchToken** (not unique — every post created in the same submission shares one,
-  which is the manage link).
+  priceCents (`0`=free, `null`=negotiable), notes, **phone and/or telegramHandle** (at least one
+  required — a poster can share just a Telegram handle if they'd rather not give a number),
+  status (AVAILABLE/SOLD/EXPIRED), and a **batchToken** (not unique — every post created in the
+  same submission shares one, which is the manage link).
 - **GameSession** (a game seeking players) — like Listing plus playersNeeded, skillMin/skillMax
   (a skill-level range), pricePerPlayerCents; status OPEN/FILLED/EXPIRED.
 - **RateLimitEvent** — hashed IP + action + optional target, for Postgres-backed rate limiting.
@@ -183,13 +184,17 @@ sequenceDiagram
    that URL is the *only* way to manage any post in the batch (no login), so the click forces
    the poster to save it before they can do anything else.
 3. **Browse** — a buyer opens `/` (server component). `listingService.listListings` runs an
-   on-read sweep (expire past posts, scrub old phones), then returns rows via
-   `PUBLIC_LISTING_SELECT` — a select that **structurally omits `phone` and `batchToken`**, so
-   the number never reaches the browser.
+   on-read sweep (expire past posts, scrub old phones/handles), then returns rows via
+   `PUBLIC_LISTING_SELECT` — a select that **structurally omits `phone`/`telegramHandle` and
+   `batchToken`**, so contact info never reaches the browser. The venue's address (curated
+   venues only) is included so the detail page can link out to Google Maps — no coordinates are
+   stored, it's a `maps.google.com/search?query=<name>,<address>` link built on read
+   (`lib/venue.ts`'s `resolveVenueDisplay`).
 4. **Reveal** — on the detail page the buyer taps "Reveal contact" → `POST
    /api/listings/[id]/reveal`. This endpoint is rate-limited (per IP+listing and globally) and
-   is the *only* path that returns a phone number. The UI shows it with `tel:` and WhatsApp
-   deep links.
+   is the *only* path that returns phone/Telegram. The UI shows whichever the poster gave —
+   `tel:`/WhatsApp deep links for a phone, a `t.me/<handle>` link for Telegram, both if both
+   were given.
 5. **Manage** — the seller opens their manage link, which lists every post in the batch. Each
    one has its own Edit (date/time/price/notes, and for games, players needed/skill range),
    "Mark as sold/filled" and its undo "Revert to available/open" (both `PATCH
@@ -211,15 +216,19 @@ imports dayjs). `createdAt`/`updatedAt` remain normal UTC machine timestamps.
 
 ## Security & privacy
 
-- **Phone numbers never appear in page HTML or list/detail JSON** — only the rate-limited
-  reveal endpoint returns them. Enforced structurally by the `PUBLIC_*_SELECT` objects (the
-  phone column is physically not selected), so a page literally cannot render it.
+- **Phone numbers and Telegram handles never appear in page HTML or list/detail JSON** — only
+  the rate-limited reveal endpoint returns them. Enforced structurally by the `PUBLIC_*_SELECT`
+  objects (neither column is selected), so a page literally cannot render them. Telegram is
+  gated the same way as phone (same reveal rate limit, same 14-day post-expiry scrub) even
+  though a public @handle is inherently less sensitive than a number — consistency over
+  cutting a corner.
 - **Rate limiting** (Postgres-backed, no Redis) — reveal: 3/hr per listing+IP, 30/hr + 100/day
   per IP overall; create (post): 10/hr per IP; report/venue-suggestion: 15/hr per IP; presence
   heartbeat: 300/hr per IP (limits are generous because Singapore mobile carriers use CGNAT,
   sharing IPs). See `src/services/rateLimitService.ts` for the source of truth.
 - **Anti-spam** — hidden honeypot field (a filled `website` field silently returns success
-  and writes nothing), phone format validation, max 5 active posts per phone.
+  and writes nothing), phone/Telegram format validation, max 5 active posts per contact
+  (phone if given, else Telegram handle — see `batchService.ts`'s `contactWhere`).
 - **PDPA-minded** — IPs are stored only as salted SHA-256 hashes; phone numbers are scrubbed
   14 days after a post expires; the footer states exactly what's retained.
 - **Manage links** — unguessable UUID tokens, `noindex` meta + `X-Robots-Tag` header, and
