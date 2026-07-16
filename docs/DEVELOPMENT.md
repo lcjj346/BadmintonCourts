@@ -114,7 +114,8 @@ src/
     logger.ts                Pino with PII redaction
 prisma/
   schema.prisma              7 models
-  venues.json                458 seeded venues (halls, CCs, DUS schools)
+  venues.json                463 seeded venues (ActiveSG halls, CCs, DUS schools, and a
+                               handful of well-known private venues under OTHER)
   seed.ts                    Idempotent upsert-by-name seeder
 scripts/
   loadTestSeed.ts            Seeds/cleans tagged load-test courts+games (local or prod)

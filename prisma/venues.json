@@ -457,5 +457,10 @@
   { "name": "Zhenghua Primary School", "address": "9 Fajar Road, Singapore", "postalCode": "679002", "region": "WEST", "venueType": "SCHOOL", "availabilityNote": "Weekends & school holidays only" },
   { "name": "Zhenghua Secondary School", "address": "62 Bukit Panjang Ring Road, Singapore", "postalCode": "679962", "region": "WEST", "venueType": "SCHOOL", "availabilityNote": "Weekends & school holidays only" },
   { "name": "Zhonghua Primary School", "address": "12 Serangoon Avenue 4, Singapore", "postalCode": "556095", "region": "SOUTH", "venueType": "SCHOOL", "availabilityNote": "Weekends & school holidays only" },
-  { "name": "Zhonghua Secondary School", "address": "13 Serangoon Avenue 3, Singapore", "postalCode": "556123", "region": "SOUTH", "venueType": "SCHOOL", "availabilityNote": "Weekends & school holidays only" }
+  { "name": "Zhonghua Secondary School", "address": "13 Serangoon Avenue 3, Singapore", "postalCode": "556123", "region": "SOUTH", "venueType": "SCHOOL", "availabilityNote": "Weekends & school holidays only" },
+  { "name": "Cereza Sports Hall", "address": "3 Chin Cheng Avenue, Singapore", "postalCode": "429401", "region": "EAST", "venueType": "OTHER" },
+  { "name": "OCBC Arena", "address": "5 Stadium Drive, Singapore", "postalCode": "397631", "region": "CENTRAL", "venueType": "OTHER" },
+  { "name": "Singapore Badminton Hall @ Sims", "address": "1 Lorong 23 Geylang, Singapore", "postalCode": "388352", "region": "EAST", "venueType": "OTHER" },
+  { "name": "Singapore Badminton Hall East Coast @ Expo", "address": "Singapore Expo, Carpark J, Changi South Avenue 1, Singapore", "postalCode": "486150", "region": "EAST", "venueType": "OTHER" },
+  { "name": "Smash Arena", "address": "511 Upper Jurong Road, Singapore", "postalCode": "638366", "region": "WEST", "venueType": "OTHER" }
 ]
