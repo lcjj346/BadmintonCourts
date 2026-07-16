@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/db";
 import { resetDb, makeVenue } from "@/lib/__tests__/helpers/db";
 import { todaySgt } from "@/lib/time";
-import { createSession, listSessions, revealSessionPhone } from "@/services/sessionService";
+import { createSessionBatch, listSessions, revealSessionPhone } from "@/services/sessionService";
 
 beforeEach(resetDb);
 afterAll(() => prisma.$disconnect());
@@ -15,10 +15,21 @@ const input = (venueId: string, over: Record<string, unknown> = {}) => ({
   venueId, date: tomorrow, startTime: "18:00", endTime: "20:00",
   playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
   phone: "+6591234567", ...over,
-}) as Parameters<typeof createSession>[0];
+});
+
+// Single-item wrapper around the batch-create service, mirroring the old single-post API
+// so most test bodies stay unchanged.
+async function createSession(item: ReturnType<typeof input>) {
+  const { phone, ...rest } = item;
+  const { batchToken, ids } = await createSessionBatch(
+    [rest] as Parameters<typeof createSessionBatch>[0],
+    phone as string,
+  );
+  return { id: ids[0], batchToken };
+}
 
 describe("sessionService", () => {
-  it("creates; board payload includes session fields, no phone/editToken", async () => {
+  it("creates; board payload includes session fields, no phone/batchToken", async () => {
     const venue = await makeVenue();
     await createSession(input(venue.id));
     const rows = await listSessions({});
@@ -27,7 +38,19 @@ describe("sessionService", () => {
     expect(rows[0].skillMin).toBe("MID_INTERMEDIATE");
     expect(rows[0].skillMax).toBe("MID_INTERMEDIATE");
     expect(rows[0]).not.toHaveProperty("phone");
-    expect(rows[0]).not.toHaveProperty("editToken");
+    expect(rows[0]).not.toHaveProperty("batchToken");
+  });
+
+  it("creates a batch of sessions sharing one batchToken", async () => {
+    const venue = await makeVenue();
+    const { phone, ...item } = input(venue.id);
+    const { batchToken, ids } = await createSessionBatch(
+      [item, { ...item, startTime: "07:00", endTime: "09:00" }] as Parameters<typeof createSessionBatch>[0],
+      phone as string,
+    );
+    expect(ids).toHaveLength(2);
+    const rows = await prisma.gameSession.findMany({ where: { batchToken } });
+    expect(rows).toHaveLength(2);
   });
 
   it("filters by skill (exact)", async () => {

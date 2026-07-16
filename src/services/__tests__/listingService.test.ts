@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { resetDb, makeVenue } from "@/lib/__tests__/helpers/db";
 import { todaySgt, strToDate } from "@/lib/time";
 import {
-  createListing, listListings, getListing, revealListingPhone,
+  createListingBatch, listListings, getListing, revealListingPhone,
   sweepExpired, ActivePostCapError,
 } from "@/services/listingService";
 
@@ -17,19 +17,30 @@ const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
 const input = (venueId: string, over: Record<string, unknown> = {}) => ({
   venueId, date: tomorrow, startTime: "08:00", endTime: "10:00",
   priceCents: 1600, phone: "+6591234567", ...over,
-}) as Parameters<typeof createListing>[0];
+});
+
+// Single-item wrapper around the batch-create service, mirroring the old single-post API
+// so most test bodies stay unchanged.
+async function createListing(item: ReturnType<typeof input>) {
+  const { phone, ...rest } = item;
+  const { batchToken, ids } = await createListingBatch(
+    [rest] as Parameters<typeof createListingBatch>[0],
+    phone as string,
+  );
+  return { id: ids[0], batchToken };
+}
 
 describe("listingService", () => {
-  it("creates and returns id + editToken; board payload has no phone/editToken", async () => {
+  it("creates and returns id + batchToken; board payload has no phone/batchToken", async () => {
     const venue = await makeVenue();
-    const { id, editToken } = await createListing(input(venue.id));
-    expect(editToken).toMatch(/^[0-9a-f-]{36}$/);
+    const { id, batchToken } = await createListing(input(venue.id));
+    expect(batchToken).toMatch(/^[0-9a-f-]{36}$/);
 
     const rows = await listListings({});
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(id);
     expect(rows[0]).not.toHaveProperty("phone");
-    expect(rows[0]).not.toHaveProperty("editToken");
+    expect(rows[0]).not.toHaveProperty("batchToken");
     expect(rows[0].venue.name).toBe("Test Hall");
 
     const detail = await getListing(id);
@@ -116,6 +127,26 @@ describe("listingService", () => {
     expect(rows[0].startTime).toBe("07:00");
     expect(rows[1].startTime).toBe("20:00");
     expect(rows[2].startTime).toBe("09:00");
+  });
+
+  it("creates a batch of listings sharing one batchToken", async () => {
+    const venue = await makeVenue();
+    const { phone, ...item } = input(venue.id);
+    const { batchToken, ids } = await createListingBatch(
+      [item, { ...item, startTime: "18:00", endTime: "20:00" }] as Parameters<typeof createListingBatch>[0],
+      phone as string,
+    );
+    expect(ids).toHaveLength(2);
+    const rows = await prisma.listing.findMany({ where: { batchToken } });
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.batchToken === batchToken)).toBe(true);
+  });
+
+  it("counts every item in a batch toward the 5-active-per-phone cap", async () => {
+    const venue = await makeVenue();
+    const { phone, ...item } = input(venue.id);
+    const items = Array.from({ length: 6 }, () => item) as Parameters<typeof createListingBatch>[0];
+    await expect(createListingBatch(items, phone as string)).rejects.toThrow(ActivePostCapError);
   });
 
   it("with available=1, only AVAILABLE listings are returned", async () => {

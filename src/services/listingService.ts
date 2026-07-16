@@ -1,7 +1,8 @@
+import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todaySgt, strToDate, nowSgtTime } from "@/lib/time";
-import type { BoardFilters, CreateListingInput } from "@/lib/schemas";
+import type { BoardFilters, CreateListingItemInput } from "@/lib/schemas";
 
 export class ActivePostCapError extends Error {
   constructor() {
@@ -83,27 +84,35 @@ export async function getListing(id: string): Promise<PublicListing | null> {
   return prisma.listing.findUnique({ where: { id }, select: PUBLIC_LISTING_SELECT });
 }
 
-export async function createListing(
-  input: CreateListingInput,
-): Promise<{ id: string; editToken: string }> {
+/** Creates every item under one shared batchToken — the manage link for all of them. */
+export async function createListingBatch(
+  items: CreateListingItemInput[],
+  phone: string,
+): Promise<{ batchToken: string; ids: string[] }> {
   const active = await prisma.listing.count({
-    where: { phone: input.phone, status: "AVAILABLE" },
+    where: { phone, status: "AVAILABLE" },
   });
-  if (active >= 5) throw new ActivePostCapError();
+  if (active + items.length > 5) throw new ActivePostCapError();
 
-  const row = await prisma.listing.create({
-    data: {
-      venueId: input.venueId,
-      date: strToDate(input.date),
-      startTime: input.startTime,
-      endTime: input.endTime,
-      priceCents: input.priceCents,
-      notes: input.notes,
-      phone: input.phone,
-    },
-    select: { id: true, editToken: true },
-  });
-  return row;
+  const batchToken = randomUUID();
+  const rows = await prisma.$transaction(
+    items.map((item) =>
+      prisma.listing.create({
+        data: {
+          venueId: item.venueId,
+          date: strToDate(item.date),
+          startTime: item.startTime,
+          endTime: item.endTime,
+          priceCents: item.priceCents,
+          notes: item.notes,
+          phone,
+          batchToken,
+        },
+        select: { id: true },
+      }),
+    ),
+  );
+  return { batchToken, ids: rows.map((r) => r.id) };
 }
 
 export async function revealListingPhone(id: string): Promise<string | null> {

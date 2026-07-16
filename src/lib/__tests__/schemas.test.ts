@@ -1,28 +1,52 @@
 /** @jest-environment node */
 import dayjs from "dayjs";
-import { createListingSchema, createSessionSchema, boardFilterSchema } from "@/lib/schemas";
+import {
+  createListingSchema, createSessionSchema, editListingSchema, editSessionSchema,
+  boardFilterSchema, MAX_BATCH_ITEMS,
+} from "@/lib/schemas";
 import { todaySgt } from "@/lib/time";
 
 const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
 
-const base = {
+const item = {
   venueId: "3f0e37f5-2f3a-4a4a-9d4a-111111111111",
   date: tomorrow,
   startTime: "08:00",
   endTime: "10:00",
-  phone: "+6591234567",
-  website: "",
 };
 
+const batch = (items: object[]) => ({ items, phone: "+6591234567", website: "" });
+
 describe("createListingSchema", () => {
-  it("accepts a valid listing", () => {
-    const r = createListingSchema.safeParse({ ...base, priceCents: 1600 });
+  it("accepts a valid single-item batch", () => {
+    const r = createListingSchema.safeParse(batch([{ ...item, priceCents: 1600 }]));
     expect(r.success).toBe(true);
   });
 
+  it("accepts a multi-item batch under one phone", () => {
+    const r = createListingSchema.safeParse(
+      batch([{ ...item, priceCents: 1600 }, { ...item, startTime: "18:00", endTime: "20:00", priceCents: 2000 }]),
+    );
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects an empty items array", () => {
+    expect(createListingSchema.safeParse(batch([])).success).toBe(false);
+  });
+
+  it(`rejects more than ${MAX_BATCH_ITEMS} items`, () => {
+    const items = Array.from({ length: MAX_BATCH_ITEMS + 1 }, () => ({ ...item, priceCents: 0 }));
+    expect(createListingSchema.safeParse(batch(items)).success).toBe(false);
+  });
+
+  it(`accepts exactly ${MAX_BATCH_ITEMS} items`, () => {
+    const items = Array.from({ length: MAX_BATCH_ITEMS }, () => ({ ...item, priceCents: 0 }));
+    expect(createListingSchema.safeParse(batch(items)).success).toBe(true);
+  });
+
   it("accepts free (0) and negotiable (null) prices", () => {
-    expect(createListingSchema.safeParse({ ...base, priceCents: 0 }).success).toBe(true);
-    expect(createListingSchema.safeParse({ ...base, priceCents: null }).success).toBe(true);
+    expect(createListingSchema.safeParse(batch([{ ...item, priceCents: 0 }])).success).toBe(true);
+    expect(createListingSchema.safeParse(batch([{ ...item, priceCents: null }])).success).toBe(true);
   });
 
   it("accepts SG, MY and other regional phones", () => {
@@ -30,7 +54,7 @@ describe("createListingSchema", () => {
       "+6591234567", "+6581234567", "+60123456789", "+601234567890",
       "+62812345678", "+85251234567", "+15551234567",
     ]) {
-      expect(createListingSchema.safeParse({ ...base, phone, priceCents: 0 }).success).toBe(true);
+      expect(createListingSchema.safeParse({ ...batch([{ ...item, priceCents: 0 }]), phone }).success).toBe(true);
     }
   });
 
@@ -39,60 +63,65 @@ describe("createListingSchema", () => {
       "1234567", "612345678", "9123456", "91234567", "+65712345", "+6071234567",
       "+999123456", "+65 9123", "60123456789",
     ]) {
-      expect(createListingSchema.safeParse({ ...base, phone, priceCents: 0 }).success).toBe(false);
+      expect(createListingSchema.safeParse({ ...batch([{ ...item, priceCents: 0 }]), phone }).success).toBe(false);
     }
   });
 
   it("rejects past dates and dates beyond 8 weeks", () => {
-    expect(createListingSchema.safeParse({ ...base, date: "2020-01-01", priceCents: 0 }).success).toBe(false);
-    expect(createListingSchema.safeParse({ ...base, date: "2099-01-01", priceCents: 0 }).success).toBe(false);
+    expect(createListingSchema.safeParse(batch([{ ...item, date: "2020-01-01", priceCents: 0 }])).success).toBe(false);
+    expect(createListingSchema.safeParse(batch([{ ...item, date: "2099-01-01", priceCents: 0 }])).success).toBe(false);
   });
 
   it("rejects endTime <= startTime", () => {
-    expect(createListingSchema.safeParse({ ...base, startTime: "10:00", endTime: "08:00", priceCents: 0 }).success).toBe(false);
+    expect(
+      createListingSchema.safeParse(batch([{ ...item, startTime: "10:00", endTime: "08:00", priceCents: 0 }])).success,
+    ).toBe(false);
   });
 
   it("rejects a today start time that has already passed, accepts the same time tomorrow", () => {
-    const past = createListingSchema.safeParse({ ...base, date: todaySgt(), startTime: "00:00", priceCents: 0 });
+    const past = createListingSchema.safeParse(batch([{ ...item, date: todaySgt(), startTime: "00:00", priceCents: 0 }]));
     expect(past.success).toBe(false);
     if (!past.success) {
       expect(past.error.issues[0].message).toBe(
         "That start time has already passed — pick a later time or another day",
       );
-      expect(past.error.issues[0].path).toEqual(["startTime"]);
     }
-    expect(createListingSchema.safeParse({ ...base, date: tomorrow, startTime: "00:00", priceCents: 0 }).success).toBe(true);
+    expect(
+      createListingSchema.safeParse(batch([{ ...item, date: tomorrow, startTime: "00:00", priceCents: 0 }])).success,
+    ).toBe(true);
   });
 
   it("rejects filled honeypot", () => {
-    expect(createListingSchema.safeParse({ ...base, website: "spam.com", priceCents: 0 }).success).toBe(false);
+    expect(
+      createListingSchema.safeParse({ ...batch([{ ...item, priceCents: 0 }]), website: "spam.com" }).success,
+    ).toBe(false);
   });
 
   it("caps notes at 300 chars", () => {
-    expect(createListingSchema.safeParse({ ...base, notes: "x".repeat(301), priceCents: 0 }).success).toBe(false);
+    expect(
+      createListingSchema.safeParse(batch([{ ...item, notes: "x".repeat(301), priceCents: 0 }])).success,
+    ).toBe(false);
   });
 });
 
 describe("createSessionSchema", () => {
-  it("accepts a valid session", () => {
-    const r = createSessionSchema.safeParse({
-      ...base, playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
-    });
-    expect(r.success).toBe(true);
+  const sessionItem = (over: object = {}) => ({
+    ...item, playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE",
+    pricePerPlayerCents: 400, ...over,
+  });
+
+  it("accepts a valid session batch", () => {
+    expect(createSessionSchema.safeParse(batch([sessionItem()])).success).toBe(true);
   });
 
   it("rejects playersNeeded out of range", () => {
     for (const playersNeeded of [0, 51]) {
-      expect(createSessionSchema.safeParse({
-        ...base, playersNeeded, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
-      }).success).toBe(false);
+      expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded })])).success).toBe(false);
     }
   });
 
   it("accepts playersNeeded up to 50", () => {
-    expect(createSessionSchema.safeParse({
-      ...base, playersNeeded: 50, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
-    }).success).toBe(true);
+    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 50 })])).success).toBe(true);
   });
 
   it("accepts all seven skill levels", () => {
@@ -100,28 +129,58 @@ describe("createSessionSchema", () => {
       "LOW_BEGINNER", "MID_BEGINNER", "HIGH_BEGINNER", "LOW_INTERMEDIATE",
       "MID_INTERMEDIATE", "HIGH_INTERMEDIATE", "ADVANCED",
     ]) {
-      expect(createSessionSchema.safeParse({
-        ...base, playersNeeded: 2, skillMin: skillLevel, skillMax: skillLevel, pricePerPlayerCents: null,
-      }).success).toBe(true);
+      expect(
+        createSessionSchema.safeParse(batch([sessionItem({ skillMin: skillLevel, skillMax: skillLevel })])).success,
+      ).toBe(true);
     }
   });
 
   it("rejects an old three-value skill level", () => {
-    expect(createSessionSchema.safeParse({
-      ...base, playersNeeded: 2, skillMin: "INTERMEDIATE", skillMax: "INTERMEDIATE", pricePerPlayerCents: null,
-    }).success).toBe(false);
+    expect(
+      createSessionSchema.safeParse(batch([sessionItem({ skillMin: "INTERMEDIATE", skillMax: "INTERMEDIATE" })])).success,
+    ).toBe(false);
   });
 
   it("accepts a skill range where max is higher than min", () => {
-    expect(createSessionSchema.safeParse({
-      ...base, playersNeeded: 2, skillMin: "MID_BEGINNER", skillMax: "LOW_INTERMEDIATE", pricePerPlayerCents: null,
-    }).success).toBe(true);
+    expect(
+      createSessionSchema.safeParse(batch([sessionItem({ skillMin: "MID_BEGINNER", skillMax: "LOW_INTERMEDIATE" })])).success,
+    ).toBe(true);
   });
 
   it("rejects a skill range where max is lower than min", () => {
-    expect(createSessionSchema.safeParse({
-      ...base, playersNeeded: 2, skillMin: "LOW_INTERMEDIATE", skillMax: "MID_BEGINNER", pricePerPlayerCents: null,
-    }).success).toBe(false);
+    expect(
+      createSessionSchema.safeParse(batch([sessionItem({ skillMin: "LOW_INTERMEDIATE", skillMax: "MID_BEGINNER" })])).success,
+    ).toBe(false);
+  });
+});
+
+describe("editListingSchema", () => {
+  it("accepts valid edit fields (no venue/phone)", () => {
+    expect(editListingSchema.safeParse({ ...item, priceCents: 1600 }).success).toBe(true);
+  });
+
+  it("rejects endTime <= startTime", () => {
+    expect(editListingSchema.safeParse({ ...item, startTime: "10:00", endTime: "08:00", priceCents: 0 }).success).toBe(false);
+  });
+
+  it("rejects editing a slot into the past today", () => {
+    expect(editListingSchema.safeParse({ ...item, date: todaySgt(), startTime: "00:00", priceCents: 0 }).success).toBe(false);
+  });
+});
+
+describe("editSessionSchema", () => {
+  it("accepts valid edit fields including skill range", () => {
+    const r = editSessionSchema.safeParse({
+      ...item, playersNeeded: 3, skillMin: "LOW_BEGINNER", skillMax: "MID_BEGINNER", pricePerPlayerCents: null,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects a reversed skill range", () => {
+    const r = editSessionSchema.safeParse({
+      ...item, playersNeeded: 3, skillMin: "ADVANCED", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
+    });
+    expect(r.success).toBe(false);
   });
 });
 

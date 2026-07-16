@@ -2,81 +2,257 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PLAYER_COUNT_OPTIONS } from "@/lib/skill";
+import { todaySgt, maxPostDateSgt, TIME_OPTIONS, addHoursToTime } from "@/lib/time";
+import { SKILL_OPTIONS, SKILL_ORDER, PLAYER_COUNT_OPTIONS, type SkillLevel } from "@/lib/skill";
+import type { ManagedPost } from "@/services/manageService";
+
+function durationFromTimes(startTime: string, endTime: string): number {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  return Math.max(1, Math.round(((eh * 60 + em) - (sh * 60 + sm)) / 60));
+}
 
 export function ManageActions({
-  token, type, closed, playersNeeded,
+  token, post: managed, postCount,
 }: {
-  token: string; type: "listing" | "session"; closed: boolean; playersNeeded?: number;
+  token: string; post: ManagedPost; postCount: number;
 }) {
   const router = useRouter();
+  const { type, post } = managed;
+  const closed = post.status === "SOLD" || post.status === "FILLED";
   const [busy, setBusy] = useState(false);
-  const [players, setPlayers] = useState(playersNeeded ?? 2);
-  const [updating, setUpdating] = useState(false);
-  const [updated, setUpdated] = useState(false);
-  const closeLabel = type === "listing" ? "Mark as sold" : "Mark as filled";
+  const [editing, setEditing] = useState(false);
 
-  async function act(method: "PATCH" | "DELETE") {
-    if (method === "DELETE" && !confirm("Delete this post permanently?")) return;
+  const [date, setDate] = useState(post.date);
+  const [startTime, setStartTime] = useState(post.startTime);
+  const [duration, setDuration] = useState(durationFromTimes(post.startTime, post.endTime));
+  const initialCents = type === "listing" ? post.priceCents : post.pricePerPlayerCents;
+  const [price, setPrice] = useState(initialCents ? String(initialCents / 100) : "");
+  const [free, setFree] = useState(initialCents === 0);
+  const [notes, setNotes] = useState(post.notes ?? "");
+  const [playersNeeded, setPlayersNeeded] = useState(post.playersNeeded ?? 2);
+  const [skillMin, setSkillMin] = useState<SkillLevel>((post.skillMin as SkillLevel) ?? "MID_INTERMEDIATE");
+  const [skillMax, setSkillMax] = useState<SkillLevel>((post.skillMax as SkillLevel) ?? "MID_INTERMEDIATE");
+
+  const closeLabel = type === "listing" ? "Mark as sold" : "Mark as filled";
+  const priceLabel = type === "listing" ? "Price (SGD)" : "Cost per player (SGD)";
+
+  async function act(body: Record<string, unknown>, method: "PATCH" | "DELETE" = "PATCH") {
     setBusy(true);
-    const res = await fetch(`/api/manage/${token}`, { method });
-    setBusy(false);
-    if (!res.ok) return alert("Something went wrong — try again");
-    if (method === "DELETE") router.push("/");
+    try {
+      const res = await fetch(`/api/manage/${token}/${post.id}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type, ...body }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        alert(json?.error ?? "Something went wrong — try again");
+        return false;
+      }
+      return true;
+    } catch {
+      alert("Network error — try again");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function markClosed() {
+    if (await act({ action: "close" })) router.refresh();
+  }
+
+  async function remove() {
+    if (!confirm("Delete this post permanently?")) return;
+    if (!(await act({}, "DELETE"))) return;
+    // Deleting the last post in the batch leaves nothing to manage — back to the board.
+    if (postCount <= 1) router.push("/");
     else router.refresh();
   }
 
-  async function updatePlayers() {
-    setUpdating(true);
-    setUpdated(false);
-    const res = await fetch(`/api/manage/${token}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ playersNeeded: players }),
-    });
-    setUpdating(false);
-    if (!res.ok) return alert("Something went wrong — try again");
-    setUpdated(true);
-    router.refresh();
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    const cents = free ? 0 : price === "" ? null : Math.round(parseFloat(price) * 100);
+    const endTime = addHoursToTime(startTime, duration);
+    const body =
+      type === "listing"
+        ? { action: "edit", date, startTime, endTime, priceCents: cents, notes: notes || undefined }
+        : {
+            action: "edit", date, startTime, endTime, playersNeeded, skillMin, skillMax,
+            pricePerPlayerCents: cents, notes: notes || undefined,
+          };
+    if (await act(body)) {
+      setEditing(false);
+      router.refresh();
+    }
   }
 
-  return (
-    <div className="mt-4 space-y-2">
-      {type === "session" && !closed && (
-        <div className="rounded-xl border border-gray-200 bg-white p-3">
-          <label className="block text-sm font-semibold" htmlFor="playersNeeded">
-            Players still needed
-          </label>
-          <div className="mt-2 flex items-center gap-3">
+  const label = "block text-xs font-semibold mt-3 mb-1";
+  const input = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white";
+
+  if (editing) {
+    return (
+      <form onSubmit={saveEdit} className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+        <label className={label} htmlFor={`edit-date-${post.id}`}>Date</label>
+        <input
+          id={`edit-date-${post.id}`}
+          aria-label="Edit date"
+          className={input}
+          type="date"
+          value={date}
+          min={todaySgt()}
+          max={maxPostDateSgt()}
+          onChange={(e) => setDate(e.target.value)}
+          required
+        />
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label className={label}>Start</label>
             <select
-              id="playersNeeded"
-              aria-label="Players still needed"
-              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-              value={players}
-              onChange={(e) => { setPlayers(Number(e.target.value)); setUpdated(false); }}
+              className={input}
+              aria-label="Edit start time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            >
+              {TIME_OPTIONS.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className={label}>Hours</label>
+            <select
+              className={input}
+              aria-label="Edit hours"
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((h) => (
+                <option key={h} value={h}>{h}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {type === "session" && (
+          <>
+            <label className={label}>Players needed</label>
+            <select
+              className={input}
+              aria-label="Edit players needed"
+              value={playersNeeded}
+              onChange={(e) => setPlayersNeeded(Number(e.target.value))}
             >
               {PLAYER_COUNT_OPTIONS.map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
-            <button
-              onClick={updatePlayers}
-              disabled={updating}
-              className="shrink-0 rounded-xl bg-court px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {updating ? "Updating…" : updated ? "Updated ✓" : "Update"}
-            </button>
-          </div>
+            <label className={label}>Skill level</label>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <span className="mb-1 block text-[11px] text-gray-400">From</span>
+                <select
+                  className={input}
+                  aria-label="Edit skill level from"
+                  value={skillMin}
+                  onChange={(e) => {
+                    const next = e.target.value as SkillLevel;
+                    setSkillMin(next);
+                    if (SKILL_ORDER.indexOf(next) > SKILL_ORDER.indexOf(skillMax)) setSkillMax(next);
+                  }}
+                >
+                  {SKILL_OPTIONS.map(([value, text]) => (
+                    <option key={value} value={value}>{text}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <span className="mb-1 block text-[11px] text-gray-400">To</span>
+                <select
+                  className={input}
+                  aria-label="Edit skill level to"
+                  value={skillMax}
+                  onChange={(e) => setSkillMax(e.target.value as SkillLevel)}
+                >
+                  {SKILL_OPTIONS.filter(([value]) => SKILL_ORDER.indexOf(value) >= SKILL_ORDER.indexOf(skillMin)).map(
+                    ([value, text]) => (
+                      <option key={value} value={value}>{text}</option>
+                    ),
+                  )}
+                </select>
+              </div>
+            </div>
+          </>
+        )}
+
+        <label className={label}>{priceLabel}</label>
+        <div className="flex items-center gap-3">
+          <input
+            className={input}
+            type="number"
+            step="0.50"
+            min="0"
+            placeholder="Leave blank for negotiable"
+            value={price}
+            disabled={free}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+          <label className="flex shrink-0 items-center gap-1 text-sm">
+            <input type="checkbox" checked={free} onChange={(e) => setFree(e.target.checked)} /> Free
+          </label>
+        </div>
+
+        <label className={label}>Notes</label>
+        <textarea
+          className={input}
+          maxLength={300}
+          rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+
+        <div className="mt-4 flex gap-3">
+          <button type="submit" disabled={busy} className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white disabled:opacity-50">
+            {busy ? "Saving…" : "Save changes"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      {!closed && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setEditing(true)}
+            disabled={busy}
+            className="flex-1 rounded-xl border border-court py-2.5 font-semibold text-court disabled:opacity-50"
+          >
+            Edit
+          </button>
+          <button
+            onClick={markClosed}
+            disabled={busy}
+            className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white disabled:opacity-50"
+          >
+            {closeLabel}
+          </button>
         </div>
       )}
-      {!closed && (
-        <button onClick={() => act("PATCH")} disabled={busy}
-          className="w-full rounded-xl bg-court py-3 font-semibold text-white disabled:opacity-50">
-          {closeLabel}
-        </button>
-      )}
-      <button onClick={() => act("DELETE")} disabled={busy}
-        className="w-full rounded-xl border border-red-300 py-3 font-semibold text-red-600 disabled:opacity-50">
+      <button
+        onClick={remove}
+        disabled={busy}
+        className="w-full rounded-xl border border-red-300 py-2.5 font-semibold text-red-600 disabled:opacity-50"
+      >
         Delete post
       </button>
     </div>
