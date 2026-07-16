@@ -2,16 +2,16 @@ import { randomUUID } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
+const ACTIVE_POST_CAP = 10;
+
 export class ActivePostCapError extends Error {
   constructor() {
-    super("This contact already has 5 active posts");
+    super(`This contact already has ${ACTIVE_POST_CAP} active posts`);
     this.name = "ActivePostCapError";
   }
 }
 
-const ACTIVE_POST_CAP = 5;
-
-/** Shared by listing/session create + add-to-batch — one contact can have at most 5 active posts. */
+/** Shared by listing/session create + add-to-batch — one contact can have at most 10 active posts. */
 export function assertUnderActiveCap(activeCount: number, newCount: number): void {
   if (activeCount + newCount > ACTIVE_POST_CAP) throw new ActivePostCapError();
 }
