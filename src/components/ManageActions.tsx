@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DateField } from "@/components/DateField";
 import { todaySgt, maxPostDateSgt, TIME_OPTIONS, addHoursToTime } from "@/lib/time";
 import { SKILL_OPTIONS, SKILL_ORDER, PLAYER_COUNT_OPTIONS, type SkillLevel } from "@/lib/skill";
 import type { ManagedPost } from "@/services/manageService";
@@ -111,16 +112,13 @@ export function ManageActions({
     return (
       <form onSubmit={saveEdit} className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
         <label className={label} htmlFor={`edit-date-${post.id}`}>Date</label>
-        <input
+        <DateField
           id={`edit-date-${post.id}`}
-          aria-label="Edit date"
           className={input}
-          type="date"
           value={date}
           min={todaySgt()}
           max={maxPostDateSgt()}
-          onChange={(e) => setDate(e.target.value)}
-          required
+          onChange={setDate}
         />
         <div className="flex gap-3">
           <div className="flex-1">
@@ -250,13 +248,13 @@ export function ManageActions({
         />
 
         <div className="mt-4 flex gap-3">
-          <button type="submit" disabled={busy} className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white disabled:opacity-50">
+          <button type="submit" disabled={busy} className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white transition-colors hover:bg-court/90 disabled:opacity-50">
             {busy ? "Saving…" : "Save changes"}
           </button>
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600"
+            className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -272,14 +270,14 @@ export function ManageActions({
           <button
             onClick={() => setEditing(true)}
             disabled={busy}
-            className="flex-1 rounded-xl border border-court py-2.5 font-semibold text-court disabled:opacity-50"
+            className="flex-1 rounded-xl border border-court py-2.5 font-semibold text-court transition-colors hover:bg-court-light/60 disabled:opacity-50"
           >
             Edit
           </button>
           <button
             onClick={markClosed}
             disabled={busy}
-            className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white disabled:opacity-50"
+            className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white transition-colors hover:bg-court/90 disabled:opacity-50"
           >
             {closeLabel}
           </button>
@@ -289,7 +287,7 @@ export function ManageActions({
         <button
           onClick={reopen}
           disabled={busy}
-          className="w-full rounded-xl border border-court py-2.5 font-semibold text-court disabled:opacity-50"
+          className="w-full rounded-xl border border-court py-2.5 font-semibold text-court transition-colors hover:bg-court-light/60 disabled:opacity-50"
         >
           {reopenLabel}
         </button>
@@ -297,7 +295,7 @@ export function ManageActions({
       <button
         onClick={remove}
         disabled={busy}
-        className="w-full rounded-xl border border-red-300 py-2.5 font-semibold text-red-600 disabled:opacity-50"
+        className="w-full rounded-xl border border-red-300 py-2.5 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
       >
         Delete post
       </button>

@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
  * the venue line, both passed in by the caller.
  */
 export function EntryCard({
-  href, claimed, status, title, startTime, endTime, region, availabilityNote, priceNode, extra,
+  href, claimed, status, title, startTime, endTime, region, priceNode, extra,
 }: {
   href: string;
   claimed: boolean;
@@ -17,7 +17,6 @@ export function EntryCard({
   startTime: string;
   endTime: string;
   region: string;
-  availabilityNote?: string | null;
   priceNode: ReactNode;
   extra?: ReactNode;
 }) {
@@ -40,12 +39,6 @@ export function EntryCard({
             <span className="text-[11px] font-semibold uppercase tracking-wide text-court/70">{region}</span>
           </div>
           {extra}
-          {availabilityNote && (
-            <div className="mt-1.5 flex items-start gap-1 text-xs text-amber-700">
-              <span aria-hidden className="mt-[3px] size-1 shrink-0 rounded-full bg-amber-500" />
-              <span>{availabilityNote}</span>
-            </div>
-          )}
         </div>
         <div className="flex flex-col items-end gap-1.5">
           <span className="whitespace-nowrap rounded-lg bg-court-light px-2.5 py-1 text-[15px] font-bold text-court">

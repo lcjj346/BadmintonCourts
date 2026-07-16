@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dayjs from "dayjs";
+import { BottomSheet } from "@/components/BottomSheet";
+import { CalendarGrid } from "@/components/CalendarGrid";
 import { todaySgt, maxPostDateSgt, formatDateLabel } from "@/lib/time";
 
 export function DateStrip() {
@@ -10,18 +12,7 @@ export function DateStrip() {
   const pathname = usePathname();
   const params = useSearchParams();
   const selected = params.get("date");
-  const dateInputRef = useRef<HTMLInputElement>(null);
-
-  function openPicker() {
-    const el = dateInputRef.current;
-    if (!el) return;
-    try {
-      el.showPicker(); // reliable programmatic open (Chrome/Edge/Safari 16+)
-    } catch {
-      el.focus();
-      el.click(); // fallback for browsers without showPicker
-    }
-  }
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const days = Array.from({ length: 14 }, (_, i) =>
     dayjs(todaySgt()).add(i, "day").format("YYYY-MM-DD"),
@@ -35,16 +26,18 @@ export function DateStrip() {
   }
 
   const pillClass = (active: boolean) =>
-    `shrink-0 rounded-full border px-3 py-1 text-sm ${
-      active ? "border-court bg-court text-white" : "border-gray-300 bg-white"
+    `shrink-0 rounded-full border px-3 py-1 text-sm transition-colors ${
+      active
+        ? "border-court bg-court text-white hover:bg-court/90"
+        : "border-gray-300 bg-white hover:border-court hover:bg-court-light/60"
     }`;
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-3 pt-3">
       <button
         type="button"
-        onClick={openPicker}
-        className="relative flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-court bg-court-light px-3 py-1 text-sm font-medium text-court shadow-sm transition-colors active:bg-court active:text-white"
+        onClick={() => setPickerOpen(true)}
+        className="relative flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-court bg-court-light px-3 py-1 text-sm font-medium text-court shadow-sm transition-colors hover:bg-court hover:text-white active:bg-court active:text-white"
       >
         <svg
           aria-hidden="true"
@@ -62,16 +55,6 @@ export function DateStrip() {
           <path d="M8 15h.01M12 15h.01M16 15h.01M8 18.5h.01M12 18.5h.01" />
         </svg>
         Pick
-        <input
-          ref={dateInputRef}
-          aria-label="Jump to date"
-          type="date"
-          min={todaySgt()}
-          max={maxPostDateSgt()}
-          tabIndex={-1}
-          className="pointer-events-none absolute inset-0 opacity-0"
-          onChange={(e) => e.target.value && go(e.target.value)}
-        />
       </button>
       <button onClick={() => go(null)} className={pillClass(!selected)}>
         All
@@ -81,6 +64,17 @@ export function DateStrip() {
           {formatDateLabel(d)}
         </button>
       ))}
+      <BottomSheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Jump to date">
+        <CalendarGrid
+          value={selected ?? todaySgt()}
+          min={todaySgt()}
+          max={maxPostDateSgt()}
+          onSelect={(d) => {
+            go(d);
+            setPickerOpen(false);
+          }}
+        />
+      </BottomSheet>
     </div>
   );
 }

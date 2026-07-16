@@ -40,8 +40,8 @@ export function VenuePicker({
               <button
                 key={v.id}
                 onClick={() => onSelect(v.id)}
-                className={`block w-full rounded-lg px-2 py-2 text-left text-sm ${
-                  v.id === selectedId ? "bg-court-light" : ""
+                className={`block w-full rounded-lg px-2 py-2 text-left text-sm transition-colors ${
+                  v.id === selectedId ? "bg-court-light" : "hover:bg-court-light/60"
                 }`}
               >
                 {v.name}

@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
+import dayjs from "dayjs";
 
 const PHONE = "91234567";
 
@@ -11,13 +12,27 @@ function tomorrowSgt(): string {
   return sgt.toISOString().slice(0, 10);
 }
 
+// The Date field is a button that opens a CalendarGrid sheet (not a native
+// input), so picking a date means: open it, page forward to the right month if
+// needed, then click the day cell (aria-label matches CalendarGrid's "D MMMM YYYY").
+async function pickDate(trigger: Locator, dateStr: string) {
+  const page = trigger.page();
+  await trigger.click();
+  const dialog = page.getByRole("dialog");
+  const monthLabel = dayjs(dateStr).format("MMMM YYYY");
+  while ((await dialog.getByText(monthLabel).count()) === 0) {
+    await dialog.getByRole("button", { name: "Next month" }).click();
+  }
+  await dialog.getByRole("button", { name: dayjs(dateStr).format("D MMMM YYYY"), exact: true }).click();
+}
+
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {
   // Post a court listing.
   await page.goto("/post/court");
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
@@ -69,7 +84,7 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByLabel("Skill level from").selectOption("ADVANCED");
   await page.getByPlaceholder("9123 4567").fill("81234567");
   await page.getByRole("button", { name: /post game/i }).click();
@@ -109,7 +124,7 @@ test("posts two courts in one batch under a single manage link", async ({ page }
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
 
   await page.getByRole("button", { name: /add another court/i }).click();
@@ -120,7 +135,7 @@ test("posts two courts in one batch under a single manage link", async ({ page }
   const sheet = page.getByRole("dialog", { name: "Venue" });
   await sheet.getByPlaceholder(/search venues/i).fill("choa chu");
   await sheet.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").nth(1).fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date").nth(1), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).nth(1).fill("20");
 
   await page.getByPlaceholder("9123 4567").fill(PHONE);
@@ -152,7 +167,7 @@ test("can't reach 'add another' before saving the manage link, and adding one re
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
@@ -171,7 +186,7 @@ test("can't reach 'add another' before saving the manage link, and adding one re
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("20");
   await page.getByRole("button", { name: /^add court$/i }).click();
 
@@ -198,7 +213,7 @@ test("posts at a venue not in the list, and it shows up filtered by region", asy
   await page.getByRole("button", { name: /enter it and post now/i }).click();
   await page.getByPlaceholder("Venue name").fill(venueName);
   await page.getByLabel("Venue region").selectOption("EAST");
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();
@@ -225,7 +240,7 @@ test("posts with only a Telegram handle (no phone), reveals a Telegram link, and
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
   await page.getByPlaceholder("@username").fill(handle);
   await page.getByRole("button", { name: /post court/i }).click();
@@ -258,7 +273,7 @@ test("editing a post can switch its contact from phone to Telegram", async ({ pa
   await page.getByRole("button", { name: /choose a venue/i }).click();
   await page.getByPlaceholder(/search venues/i).fill("choa chu");
   await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await page.getByLabel("Date").fill(tomorrowSgt());
+  await pickDate(page.getByLabel("Date"), tomorrowSgt());
   await page.getByPlaceholder(/negotiable/i).fill("16");
   await page.getByPlaceholder("9123 4567").fill(PHONE);
   await page.getByRole("button", { name: /post court/i }).click();

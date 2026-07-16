@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/BottomSheet";
+import { DateField } from "@/components/DateField";
 import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
 import { todaySgt, maxPostDateSgt, nowSgtTime, TIME_OPTIONS, addHoursToTime } from "@/lib/time";
 import { SKILL_OPTIONS, SKILL_ORDER, PLAYER_COUNT_OPTIONS, type SkillLevel } from "@/lib/skill";
@@ -272,16 +273,13 @@ export function PostForm({
             )}
 
             <label className={label} htmlFor={`post-date-${entry.key}`}>Date</label>
-            <input
+            <DateField
               id={`post-date-${entry.key}`}
-              aria-label="Date"
               className={input}
-              type="date"
               value={entry.date}
               min={todaySgt()}
               max={maxPostDateSgt()}
-              onChange={(e) => updateEntry(entry.key, { date: e.target.value })}
-              required
+              onChange={(d) => updateEntry(entry.key, { date: d })}
             />
 
             <div className="flex gap-3">
@@ -408,7 +406,7 @@ export function PostForm({
         <button
           type="button"
           onClick={addEntry}
-          className="mt-5 w-full rounded-xl border border-dashed border-court py-2.5 text-sm font-semibold text-court"
+          className="mt-5 w-full rounded-xl border border-dashed border-court py-2.5 text-sm font-semibold text-court transition-colors hover:bg-court-light/60"
         >
           + Add another {noun}
         </button>
@@ -478,7 +476,7 @@ export function PostForm({
       <button
         type="submit"
         disabled={submitting}
-        className="mt-5 w-full rounded-xl bg-court py-3 font-semibold text-white disabled:opacity-50"
+        className="mt-5 w-full rounded-xl bg-court py-3 font-semibold text-white transition-colors hover:bg-court/90 disabled:opacity-50 disabled:hover:bg-court"
       >
         {submitting
           ? "Posting…"
