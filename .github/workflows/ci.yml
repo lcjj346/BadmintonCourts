@@ -79,6 +79,8 @@ jobs:
         run: npx prisma db seed
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
+      - name: Production build
+        run: npm run build
       - name: Run E2E
         run: npm run test:e2e
       - name: Upload Playwright report on failure
