@@ -11,6 +11,8 @@ const SKILL_LEVELS = [
   "ADVANCED",
 ] as const;
 
+export const REGIONS = ["NORTH", "SOUTH", "EAST", "WEST", "CENTRAL"] as const;
+
 const phoneSchema = z
   .string()
   .regex(
@@ -49,6 +51,20 @@ const skillOrder = (v: { skillMin: (typeof SKILL_LEVELS)[number]; skillMax: (typ
   skillIndex(v.skillMax) >= skillIndex(v.skillMin);
 const SKILL_ORDER_MSG = { message: "Max skill must be the same as or higher than min skill", path: ["skillMax"] };
 
+// A court/game is at either a curated venue (venueId) or a venue not in our list
+// (customVenueName + customRegion) — never both, never neither.
+const venueRef = z.object({
+  venueId: z.string().uuid().optional(),
+  customVenueName: z.string().min(3).max(120).optional(),
+  customRegion: z.enum(REGIONS).optional(),
+});
+const validVenueRef = (v: z.infer<typeof venueRef>) =>
+  Boolean(v.venueId) !== Boolean(v.customVenueName && v.customRegion);
+const VENUE_REF_MSG = {
+  message: "Pick a listed venue, or enter a venue name and region",
+  path: ["venueId"],
+};
+
 /** Max court/game entries in a single post submission (one shared manage link). */
 export const MAX_BATCH_ITEMS = 10;
 
@@ -61,16 +77,15 @@ const itemBase = z.object({
 });
 
 // --- Create: one item = one court/game within a batch submission. ---
-const createListingItemBase = itemBase.extend({
-  venueId: z.string().uuid(),
+const createListingItemBase = itemBase.merge(venueRef).extend({
   priceCents: z.number().int().min(0).max(50_000).nullable(),
 });
 const createListingItemSchema = createListingItemBase
   .refine(timeOrder, TIME_ORDER_MSG)
-  .refine(futureStartToday, FUTURE_START_MSG);
+  .refine(futureStartToday, FUTURE_START_MSG)
+  .refine(validVenueRef, VENUE_REF_MSG);
 
-const createSessionItemBase = itemBase.extend({
-  venueId: z.string().uuid(),
+const createSessionItemBase = itemBase.merge(venueRef).extend({
   playersNeeded: z.number().int().min(1).max(50),
   skillMin: z.enum(SKILL_LEVELS),
   skillMax: z.enum(SKILL_LEVELS),
@@ -79,7 +94,8 @@ const createSessionItemBase = itemBase.extend({
 const createSessionItemSchema = createSessionItemBase
   .refine(timeOrder, TIME_ORDER_MSG)
   .refine(futureStartToday, FUTURE_START_MSG)
-  .refine(skillOrder, SKILL_ORDER_MSG);
+  .refine(skillOrder, SKILL_ORDER_MSG)
+  .refine(validVenueRef, VENUE_REF_MSG);
 
 const batchEnvelope = z.object({
   phone: phoneSchema,
@@ -123,7 +139,7 @@ export const editSessionSchema = itemBase
 // hand-edited URL degrades gracefully instead of blanking the whole board.
 export const boardFilterSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().catch(undefined),
-  region: z.enum(["NORTH", "SOUTH", "EAST", "WEST", "CENTRAL"]).optional().catch(undefined),
+  region: z.enum(REGIONS).optional().catch(undefined),
   venueId: z.string().uuid().optional().catch(undefined),
   timeFrom: timeStr.optional().catch(undefined),
   timeTo: timeStr.optional().catch(undefined),

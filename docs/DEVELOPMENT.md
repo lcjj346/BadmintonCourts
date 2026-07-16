@@ -128,9 +128,11 @@ e2e-load/                    Playwright load test — opt-in only, see Testing
 - **Venue** — name, address, postalCode, region (NORTH/SOUTH/EAST/WEST/CENTRAL), venueType
   (SPORTS_HALL/COMMUNITY_CENTRE/SCHOOL/OTHER), optional availabilityNote (e.g. schools:
   "Weekends & school holidays only").
-- **Listing** (a court for sale) — venue, date, start/end time, priceCents (`0`=free,
-  `null`=negotiable), notes, **phone**, status (AVAILABLE/SOLD/EXPIRED), and a **batchToken**
-  (not unique — every post created in the same submission shares one, which is the manage link).
+- **Listing** (a court for sale) — venue OR customVenueName+customRegion (a venue not in our
+  curated list — mutually exclusive, enforced by the create schema), date, start/end time,
+  priceCents (`0`=free, `null`=negotiable), notes, **phone**, status (AVAILABLE/SOLD/EXPIRED),
+  and a **batchToken** (not unique — every post created in the same submission shares one,
+  which is the manage link).
 - **GameSession** (a game seeking players) — like Listing plus playersNeeded, skillMin/skillMax
   (a skill-level range), pricePerPlayerCents; status OPEN/FILLED/EXPIRED.
 - **RateLimitEvent** — hashed IP + action + optional target, for Postgres-backed rate limiting.
@@ -368,8 +370,13 @@ This is a deliberately lean MVP. Known limitations:
   identity. If abuse appears, the documented next step is SMS OTP on posting (not built).
 - **Trust-based transactions.** Payment and no-shows are entirely off-platform; the app only
   connects people. There is no escrow, rating, or dispute system.
-- **Curated venues only.** You can't type a free-text venue (that would break filtering).
-  Missing venues go through the "Request a venue" form and are added to the seed manually.
+- **Free-text venues can't be filtered by venue.** A poster whose venue isn't in the curated
+  list can enter a name + region and post immediately (`customVenueName`/`customRegion` on
+  Listing/GameSession, `venue: null`) — it shows up under region/date/time filters like any
+  other post, just not under the "Venue" filter (which only lists curated venues) or in venue
+  autocomplete. There's no dedup/normalization on free-text names, so the same real place typed
+  two different ways won't merge. The "Request a venue" form still exists for getting a venue
+  permanently added to the curated list (and thus filterable by venue).
 - **Coarse rate limiting.** Postgres-counted windows with a non-transactional check-then-write;
   a burst could allow an occasional extra reveal. Fine at this scale, not a hardened control.
 - **No realtime.** The board is server-rendered per request; there are no live updates,

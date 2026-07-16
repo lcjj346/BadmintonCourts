@@ -189,3 +189,30 @@ test("can't reach 'add another' before saving the manage link, and adding one re
   await page.getByRole("button", { name: /delete post/i }).first().click();
   await expect(page).toHaveURL("/");
 });
+
+test("posts at a venue not in the list, and it shows up filtered by region", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  const venueName = `Test Private Hall ${Date.now()}`;
+
+  await page.goto("/post/court");
+  await page.getByRole("button", { name: /enter it and post now/i }).click();
+  await page.getByPlaceholder("Venue name").fill(venueName);
+  await page.getByLabel("Venue region").selectOption("EAST");
+  await page.getByLabel("Date").fill(tomorrowSgt());
+  await page.getByPlaceholder(/negotiable/i).fill("16");
+  await page.getByPlaceholder("9123 4567").fill(PHONE);
+  await page.getByRole("button", { name: /post court/i }).click();
+
+  await expect(page).toHaveURL(/\/manage\/[0-9a-f-]{36}\?created=1/);
+  const manageUrl = page.url().split("?")[0];
+  await page.getByRole("button", { name: /copy my manage link/i }).click();
+  await expect(page.getByText(venueName)).toBeVisible();
+
+  // Shows on the board, filterable by region even without a curated venue.
+  await page.goto("/?region=EAST");
+  await expect(page.getByText(venueName)).toBeVisible();
+
+  await page.goto(manageUrl);
+  await page.getByRole("button", { name: /delete post/i }).click();
+  await expect(page).toHaveURL("/");
+});

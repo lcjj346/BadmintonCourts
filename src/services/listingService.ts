@@ -9,6 +9,7 @@ export { ActivePostCapError };
 const PUBLIC_LISTING_SELECT = {
   id: true, date: true, startTime: true, endTime: true,
   priceCents: true, notes: true, status: true, createdAt: true,
+  customVenueName: true, customRegion: true,
   venue: {
     select: { id: true, name: true, region: true, venueType: true, availabilityNote: true },
   },
@@ -59,7 +60,9 @@ export async function listListings(filters: BoardFilters): Promise<PublicListing
       date: filters.date ? strToDate(filters.date) : { gte: strToDate(todaySgt()) },
       status: filters.available ? "AVAILABLE" : { in: ["AVAILABLE", "SOLD"] },
       ...(filters.venueId ? { venueId: filters.venueId } : {}),
-      ...(filters.region ? { venue: { region: filters.region } } : {}),
+      ...(filters.region
+        ? { OR: [{ venue: { region: filters.region } }, { customRegion: filters.region }] }
+        : {}),
       ...(filters.timeFrom || filters.timeTo
         ? {
             startTime: {
@@ -83,6 +86,8 @@ function listingCreator(item: CreateListingItemInput, phone: string, batchToken:
   return prisma.listing.create({
     data: {
       venueId: item.venueId,
+      customVenueName: item.customVenueName,
+      customRegion: item.customRegion,
       date: strToDate(item.date),
       startTime: item.startTime,
       endTime: item.endTime,

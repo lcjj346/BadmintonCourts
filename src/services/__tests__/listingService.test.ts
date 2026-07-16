@@ -41,10 +41,30 @@ describe("listingService", () => {
     expect(rows[0].id).toBe(id);
     expect(rows[0]).not.toHaveProperty("phone");
     expect(rows[0]).not.toHaveProperty("batchToken");
-    expect(rows[0].venue.name).toBe("Test Hall");
+    expect(rows[0].venue?.name).toBe("Test Hall");
 
     const detail = await getListing(id);
     expect(detail).not.toHaveProperty("phone");
+  });
+
+  it("creates a listing at a custom (unlisted) venue, no venueId", async () => {
+    const { batchToken, ids } = await createListingBatch(
+      [{
+        date: tomorrow, startTime: "08:00", endTime: "10:00", priceCents: 1600,
+        customVenueName: "Some Private Hall", customRegion: "EAST",
+      }] as Parameters<typeof createListingBatch>[0],
+      "+6591234567",
+    );
+    expect(batchToken).toMatch(/^[0-9a-f-]{36}$/);
+
+    const row = await prisma.listing.findUniqueOrThrow({ where: { id: ids[0] } });
+    expect(row.venueId).toBeNull();
+    expect(row.customVenueName).toBe("Some Private Hall");
+    expect(row.customRegion).toBe("EAST");
+
+    const rows = await listListings({ region: "EAST" });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].venue).toBeNull();
   });
 
   it("filters by region, venue, and time range", async () => {

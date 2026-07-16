@@ -4,6 +4,7 @@ import { ListingCard } from "@/components/ListingCard";
 const listing = {
   id: "l1", date: new Date("2026-07-11T00:00:00Z"), startTime: "08:00", endTime: "10:00",
   priceCents: 1600, notes: null, status: "AVAILABLE" as const, createdAt: new Date(),
+  customVenueName: null, customRegion: null,
   venue: { id: "v1", name: "Choa Chu Kang Sport Hall", region: "WEST" as const,
     venueType: "SPORTS_HALL" as const, availabilityNote: null },
 };

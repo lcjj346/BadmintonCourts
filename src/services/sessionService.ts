@@ -10,6 +10,7 @@ const PUBLIC_SESSION_SELECT = {
   id: true, date: true, startTime: true, endTime: true,
   playersNeeded: true, skillMin: true, skillMax: true, pricePerPlayerCents: true,
   notes: true, status: true, createdAt: true,
+  customVenueName: true, customRegion: true,
   venue: {
     select: { id: true, name: true, region: true, venueType: true, availabilityNote: true },
   },
@@ -24,7 +25,9 @@ export async function listSessions(filters: BoardFilters): Promise<PublicSession
       date: filters.date ? strToDate(filters.date) : { gte: strToDate(todaySgt()) },
       status: filters.available ? "OPEN" : { in: ["OPEN", "FILLED"] },
       ...(filters.venueId ? { venueId: filters.venueId } : {}),
-      ...(filters.region ? { venue: { region: filters.region } } : {}),
+      ...(filters.region
+        ? { OR: [{ venue: { region: filters.region } }, { customRegion: filters.region }] }
+        : {}),
       ...(filters.timeFrom || filters.timeTo
         ? {
             startTime: {
@@ -56,6 +59,8 @@ function sessionCreator(item: CreateSessionItemInput, phone: string, batchToken:
   return prisma.gameSession.create({
     data: {
       venueId: item.venueId,
+      customVenueName: item.customVenueName,
+      customRegion: item.customRegion,
       date: strToDate(item.date),
       startTime: item.startTime,
       endTime: item.endTime,

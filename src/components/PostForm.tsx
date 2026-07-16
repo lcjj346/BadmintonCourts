@@ -6,7 +6,9 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { VenuePicker, type VenueOption } from "@/components/VenuePicker";
 import { todaySgt, maxPostDateSgt, nowSgtTime, TIME_OPTIONS, addHoursToTime } from "@/lib/time";
 import { SKILL_OPTIONS, SKILL_ORDER, PLAYER_COUNT_OPTIONS, type SkillLevel } from "@/lib/skill";
-import { MAX_BATCH_ITEMS } from "@/lib/schemas";
+import { MAX_BATCH_ITEMS, REGIONS } from "@/lib/schemas";
+
+type Region = (typeof REGIONS)[number];
 
 const COUNTRY_CODES: [string, string][] = [
   ["+65", "SG"], ["+60", "MY"], ["+62", "ID"], ["+63", "PH"], ["+66", "TH"],
@@ -17,6 +19,9 @@ const COUNTRY_CODES: [string, string][] = [
 type Entry = {
   key: string;
   venueId: string | null;
+  customVenue: boolean; // true = "my venue isn't listed" mode for this entry
+  customVenueName: string;
+  customRegion: Region | "";
   date: string;
   startTime: string;
   duration: number;
@@ -32,6 +37,9 @@ function makeEntry(key: string): Entry {
   return {
     key,
     venueId: null,
+    customVenue: false,
+    customVenueName: "",
+    customRegion: "",
     date: todaySgt(),
     startTime: "08:00",
     duration: 2,
@@ -93,7 +101,12 @@ export function PostForm({
     setError(null);
 
     for (const entry of entries) {
-      if (!entry.venueId) return setError("Pick a venue for every court/game");
+      if (entry.customVenue) {
+        if (!entry.customVenueName.trim()) return setError("Enter a venue name for every court/game");
+        if (!entry.customRegion) return setError("Pick a region for every court/game");
+      } else if (!entry.venueId) {
+        return setError("Pick a venue for every court/game");
+      }
       const isToday = entry.date === todaySgt();
       if (isToday && nowTime && entry.startTime <= nowTime) {
         return setError("One of your slots' start times has already passed — pick a later time or another day");
@@ -104,13 +117,16 @@ export function PostForm({
     const items = entries.map((entry) => {
       const cents = entry.free ? 0 : entry.price === "" ? null : Math.round(parseFloat(entry.price) * 100);
       const endTime = addHoursToTime(entry.startTime, entry.duration);
+      const venueFields = entry.customVenue
+        ? { venueId: undefined, customVenueName: entry.customVenueName.trim(), customRegion: entry.customRegion }
+        : { venueId: entry.venueId ?? undefined, customVenueName: undefined, customRegion: undefined };
       return kind === "court"
         ? {
-            venueId: entry.venueId, date: entry.date, startTime: entry.startTime, endTime,
+            ...venueFields, date: entry.date, startTime: entry.startTime, endTime,
             priceCents: cents, notes: entry.notes || undefined,
           }
         : {
-            venueId: entry.venueId, date: entry.date, startTime: entry.startTime, endTime,
+            ...venueFields, date: entry.date, startTime: entry.startTime, endTime,
             playersNeeded: entry.playersNeeded, skillMin: entry.skillMin, skillMax: entry.skillMax,
             pricePerPlayerCents: cents, notes: entry.notes || undefined,
           };
@@ -177,28 +193,72 @@ export function PostForm({
             )}
 
             <label className={label}>Venue</label>
-            <button
-              type="button"
-              onClick={() => setVenueSheetFor(entry.key)}
-              className={`${input} text-left`}
-            >
-              {venueName ?? "Choose a venue…"}
-            </button>
-            <BottomSheet open={venueSheetFor === entry.key} onClose={() => setVenueSheetFor(null)} title="Venue">
-              <VenuePicker
-                venues={venues}
-                selectedId={entry.venueId}
-                onSelect={(id) => {
-                  updateEntry(entry.key, { venueId: id });
-                  setVenueSheetFor(null);
-                }}
-              />
-            </BottomSheet>
-            {i === 0 && (
-              <p className="mt-1 text-xs text-gray-400">
-                Venue not listed?{" "}
-                <a className="underline" href="/venue-request">Request it</a>
-              </p>
+            {entry.customVenue ? (
+              <>
+                <input
+                  className={input}
+                  placeholder="Venue name"
+                  value={entry.customVenueName}
+                  onChange={(e) => updateEntry(entry.key, { customVenueName: e.target.value })}
+                  required
+                />
+                <select
+                  className={`${input} mt-2`}
+                  aria-label="Venue region"
+                  value={entry.customRegion}
+                  onChange={(e) => updateEntry(entry.key, { customRegion: e.target.value as Region })}
+                  required
+                >
+                  <option value="" disabled>Region…</option>
+                  {REGIONS.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => updateEntry(entry.key, { customVenue: false, customVenueName: "", customRegion: "" })}
+                  >
+                    Pick from the list instead
+                  </button>
+                </p>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setVenueSheetFor(entry.key)}
+                  className={`${input} text-left`}
+                >
+                  {venueName ?? "Choose a venue…"}
+                </button>
+                <BottomSheet open={venueSheetFor === entry.key} onClose={() => setVenueSheetFor(null)} title="Venue">
+                  <VenuePicker
+                    venues={venues}
+                    selectedId={entry.venueId}
+                    onSelect={(id) => {
+                      updateEntry(entry.key, { venueId: id });
+                      setVenueSheetFor(null);
+                    }}
+                  />
+                </BottomSheet>
+                <p className="mt-1 text-xs text-gray-400">
+                  Venue not listed?{" "}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => updateEntry(entry.key, { customVenue: true, venueId: null })}
+                  >
+                    Enter it and post now
+                  </button>
+                  {i === 0 && (
+                    <>
+                      {" "}or <a className="underline" href="/venue-request">request it be added permanently</a>
+                    </>
+                  )}
+                </p>
+              </>
             )}
 
             <label className={label} htmlFor={`post-date-${entry.key}`}>Date</label>

@@ -65,19 +65,21 @@ model Venue {
 }
 
 model Listing {
-  id         String        @id @default(uuid())
-  venueId    String
-  venue      Venue         @relation(fields: [venueId], references: [id])
-  date       DateTime      @db.Date      // SGT calendar date — see §5
-  startTime  String                       // "08:00" SGT wall-clock
-  endTime    String                       // "10:00"
-  priceCents Int?                         // 0 = free, null = negotiable
-  notes      String?
-  phone      String?                      // nullable: scrubbed post-expiry (§7). NEVER in public selects
-  status     ListingStatus @default(AVAILABLE)
-  batchToken String        @default(uuid())  // shared by every post created in the same submission — the manage-link secret
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  venueId         String?                          // null when customVenueName is set instead
+  venue           Venue?        @relation(fields: [venueId], references: [id])
+  customVenueName String?                          // set instead of venueId when the poster's venue isn't in our curated list
+  customRegion    Region?                          // region for a custom venue — ignored when venueId is set
+  date            DateTime      @db.Date           // SGT calendar date — see §5
+  startTime       String                           // "08:00" SGT wall-clock
+  endTime         String                           // "10:00"
+  priceCents      Int?                             // 0 = free, null = negotiable
+  notes           String?
+  phone           String?                          // nullable: scrubbed post-expiry (§7). NEVER in public selects
+  status          ListingStatus @default(AVAILABLE)
+  batchToken      String        @default(uuid())   // shared by every post created in the same submission — the manage-link secret
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([date, status])
   @@index([venueId])
@@ -86,8 +88,10 @@ model Listing {
 
 model GameSession {
   id                  String        @id @default(uuid())
-  venueId             String
-  venue               Venue         @relation(fields: [venueId], references: [id])
+  venueId             String?                          // null when customVenueName is set instead
+  venue               Venue?        @relation(fields: [venueId], references: [id])
+  customVenueName     String?                          // set instead of venueId when the poster's venue isn't in our curated list
+  customRegion        Region?                          // region for a custom venue — ignored when venueId is set
   date                DateTime      @db.Date
   startTime           String
   endTime             String

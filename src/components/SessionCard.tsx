@@ -1,19 +1,21 @@
 import type { PublicSession } from "@/services/sessionService";
 import { formatPrice } from "@/lib/time";
+import { resolveVenueDisplay } from "@/lib/venue";
 import { EntryCard } from "@/components/EntryCard";
 import { skillRangeLabel } from "@/lib/skill";
 
 export function SessionCard({ session }: { session: PublicSession }) {
+  const venue = resolveVenueDisplay(session);
   return (
     <EntryCard
       href={`/session/${session.id}`}
       claimed={session.status !== "OPEN"}
       status={session.status}
-      title={session.venue.name}
+      title={venue.name}
       startTime={session.startTime}
       endTime={session.endTime}
-      region={session.venue.region}
-      availabilityNote={session.venue.availabilityNote}
+      region={venue.region}
+      availabilityNote={venue.availabilityNote}
       priceNode={
         <>
           {formatPrice(session.pricePerPlayerCents)}
