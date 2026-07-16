@@ -104,16 +104,20 @@ const createSessionItemSchema = createSessionItemBase
   .refine(validVenueRef, VENUE_REF_MSG);
 
 // Phone and Telegram are both optional individually, but at least one is required —
-// enforced by the refine below, applied after items are attached so the error path
-// stays on "phone" for a clear top-of-form message.
-const batchEnvelope = z.object({
+// enforced by the refine below, applied after items/other fields are attached so the
+// error path stays on "phone" for a clear top-of-form message. Shared by the create
+// envelope and the edit schemas (editing a post can also fix a typo'd contact).
+const contactRef = z.object({
   phone: phoneSchema.optional(),
   telegramHandle: telegramHandleSchema.optional(),
-  website: honeypot, // honeypot: real users never see or fill this
 });
 const hasContact = (v: { phone?: string; telegramHandle?: string }) =>
   Boolean(v.phone) || Boolean(v.telegramHandle);
 const CONTACT_MSG = { message: "Enter a phone number or a Telegram handle", path: ["phone"] };
+
+const batchEnvelope = contactRef.extend({
+  website: honeypot, // honeypot: real users never see or fill this
+});
 
 export const createListingSchema = batchEnvelope
   .extend({ items: z.array(createListingItemSchema).min(1).max(MAX_BATCH_ITEMS) })
@@ -131,13 +135,17 @@ export const addSessionBatchItemsSchema = z.object({
   items: z.array(createSessionItemSchema).min(1).max(MAX_BATCH_ITEMS),
 });
 
-// --- Edit: one existing court/game, from its manage page. Venue is fixed (delete + repost to change it). ---
+// --- Edit: one existing court/game, from its manage page. Venue is fixed (delete + repost
+// to change it) — contact info isn't, since a typo'd phone/handle shouldn't require that. ---
 export const editListingSchema = itemBase
+  .merge(contactRef)
   .extend({ priceCents: z.number().int().min(0).max(50_000).nullable() })
   .refine(timeOrder, TIME_ORDER_MSG)
-  .refine(futureStartToday, FUTURE_START_MSG);
+  .refine(futureStartToday, FUTURE_START_MSG)
+  .refine(hasContact, CONTACT_MSG);
 
 export const editSessionSchema = itemBase
+  .merge(contactRef)
   .extend({
     playersNeeded: z.number().int().min(1).max(50),
     skillMin: z.enum(SKILL_LEVELS),
@@ -146,7 +154,8 @@ export const editSessionSchema = itemBase
   })
   .refine(timeOrder, TIME_ORDER_MSG)
   .refine(futureStartToday, FUTURE_START_MSG)
-  .refine(skillOrder, SKILL_ORDER_MSG);
+  .refine(skillOrder, SKILL_ORDER_MSG)
+  .refine(hasContact, CONTACT_MSG);
 
 // Each field falls back to undefined (no filter) on an invalid value, so a stale or
 // hand-edited URL degrades gracefully instead of blanking the whole board.

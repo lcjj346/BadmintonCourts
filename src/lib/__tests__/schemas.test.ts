@@ -212,16 +212,30 @@ describe("createSessionSchema", () => {
 });
 
 describe("editListingSchema", () => {
-  it("accepts valid edit fields (no venue/phone)", () => {
-    expect(editListingSchema.safeParse({ ...item, priceCents: 1600 }).success).toBe(true);
+  it("accepts valid edit fields (venue isn't editable, phone is)", () => {
+    expect(editListingSchema.safeParse({ ...item, priceCents: 1600, phone: "+6591234567" }).success).toBe(true);
   });
 
   it("rejects endTime <= startTime", () => {
-    expect(editListingSchema.safeParse({ ...item, startTime: "10:00", endTime: "08:00", priceCents: 0 }).success).toBe(false);
+    expect(
+      editListingSchema.safeParse({ ...item, startTime: "10:00", endTime: "08:00", priceCents: 0, phone: "+6591234567" })
+        .success,
+    ).toBe(false);
   });
 
   it("rejects editing a slot into the past today", () => {
-    expect(editListingSchema.safeParse({ ...item, date: todaySgt(), startTime: "00:00", priceCents: 0 }).success).toBe(false);
+    expect(
+      editListingSchema.safeParse({ ...item, date: todaySgt(), startTime: "00:00", priceCents: 0, phone: "+6591234567" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects neither phone nor Telegram handle", () => {
+    expect(editListingSchema.safeParse({ ...item, priceCents: 1600 }).success).toBe(false);
+  });
+
+  it("accepts a Telegram handle in place of phone", () => {
+    expect(editListingSchema.safeParse({ ...item, priceCents: 1600, telegramHandle: "some_user" }).success).toBe(true);
   });
 });
 
@@ -229,6 +243,7 @@ describe("editSessionSchema", () => {
   it("accepts valid edit fields including skill range", () => {
     const r = editSessionSchema.safeParse({
       ...item, playersNeeded: 3, skillMin: "LOW_BEGINNER", skillMax: "MID_BEGINNER", pricePerPlayerCents: null,
+      phone: "+6591234567",
     });
     expect(r.success).toBe(true);
   });

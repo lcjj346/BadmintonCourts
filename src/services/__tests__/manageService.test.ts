@@ -115,12 +115,28 @@ describe("manageService", () => {
     const [{ post }] = await findPostsByBatchToken(l.batchToken);
     const ok = await editListing(l.batchToken, post.id, {
       date: todaySgt(), startTime: "09:00", endTime: "11:00", priceCents: 2000, notes: "updated",
+      phone: "+6591234567",
     });
     expect(ok).toBe(true);
     const row = await prisma.listing.findFirstOrThrow();
     expect(row.startTime).toBe("09:00");
     expect(row.priceCents).toBe(2000);
     expect(row.notes).toBe("updated");
+    expect(row.phone).toBe("+6591234567");
+  });
+
+  it("editListing can switch from phone to Telegram-only", async () => {
+    const venue = await makeVenue();
+    const l = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
+    const [{ post }] = await findPostsByBatchToken(l.batchToken);
+    const ok = await editListing(l.batchToken, post.id, {
+      date: todaySgt(), startTime: "09:00", endTime: "11:00", priceCents: 2000, notes: "updated",
+      telegramHandle: "new_handle",
+    });
+    expect(ok).toBe(true);
+    const row = await prisma.listing.findFirstOrThrow();
+    expect(row.phone).toBeNull();
+    expect(row.telegramHandle).toBe("new_handle");
   });
 
   it("editSession updates time/skill/players/notes", async () => {
@@ -130,6 +146,7 @@ describe("manageService", () => {
     const ok = await editSession(s.batchToken, post.id, {
       date: todaySgt(), startTime: "19:00", endTime: "21:00", playersNeeded: 4,
       skillMin: "ADVANCED", skillMax: "ADVANCED", pricePerPlayerCents: 1000, notes: "updated",
+      phone: "+6581234567",
     });
     expect(ok).toBe(true);
     const row = await prisma.gameSession.findFirstOrThrow();
