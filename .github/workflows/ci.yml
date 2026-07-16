@@ -88,3 +88,30 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  migrate-production:
+    name: Deploy migrations to production
+    runs-on: ubuntu-latest
+    needs: [test, e2e]
+    # Only after a real merge to main — never on a PR, which must not touch prod.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      # Overrides the throwaway-Postgres DATABASE_URL/DIRECT_URL set at workflow level above —
+      # this is the one job in this file that's meant to touch the real database.
+      - name: Apply migrations to production
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+      - name: Reseed venues in production
+        run: npx prisma db seed
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
