@@ -97,6 +97,38 @@ describe("createListingSchema", () => {
     ).toBe(false);
   });
 
+  it("accepts a custom venue (name + region) in place of venueId", () => {
+    const { venueId, ...withoutVenueId } = item;
+    void venueId;
+    const r = createListingSchema.safeParse(
+      batch([{ ...withoutVenueId, customVenueName: "Some Private Hall", customRegion: "EAST", priceCents: 0 }]),
+    );
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects both venueId and a custom venue set together", () => {
+    const r = createListingSchema.safeParse(
+      batch([{ ...item, customVenueName: "Some Private Hall", customRegion: "EAST", priceCents: 0 }]),
+    );
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects a custom venue missing its region", () => {
+    const { venueId, ...withoutVenueId } = item;
+    void venueId;
+    const r = createListingSchema.safeParse(
+      batch([{ ...withoutVenueId, customVenueName: "Some Private Hall", priceCents: 0 }]),
+    );
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects neither venueId nor a custom venue", () => {
+    const { venueId, ...withoutVenueId } = item;
+    void venueId;
+    const r = createListingSchema.safeParse(batch([{ ...withoutVenueId, priceCents: 0 }]));
+    expect(r.success).toBe(false);
+  });
+
   it("caps notes at 300 chars", () => {
     expect(
       createListingSchema.safeParse(batch([{ ...item, notes: "x".repeat(301), priceCents: 0 }])).success,

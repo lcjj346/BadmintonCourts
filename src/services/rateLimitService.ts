@@ -46,6 +46,18 @@ export async function assertWriteAllowed(ipHash: string): Promise<void> {
   await prisma.rateLimitEvent.create({ data: { ipHash, action: "REPORT" } });
 }
 
+/**
+ * Checks + records a presence heartbeat. The client pings every 30s while a tab is
+ * open (~120/hour), so the ceiling sits well above normal usage and only bounds a
+ * script hammering the endpoint with random ids.
+ */
+export async function assertPresenceAllowed(ipHash: string): Promise<void> {
+  if ((await countEvents({ ipHash, action: "PRESENCE", windowMs: HOUR })) >= 300) {
+    throw new RateLimitError();
+  }
+  await prisma.rateLimitEvent.create({ data: { ipHash, action: "PRESENCE" } });
+}
+
 /** Checks per-target + global reveal limits, and records the event when allowed. */
 export async function assertRevealAllowed(ipHash: string, targetId: string): Promise<void> {
   const [perTarget, hourly, daily] = await Promise.all([

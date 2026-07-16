@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/services/sessionService";
 import { formatPrice, formatDateLabel, dateToStr } from "@/lib/time";
+import { resolveVenueDisplay } from "@/lib/venue";
 import { skillRangeLabel } from "@/lib/skill";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RevealButton } from "@/components/RevealButton";
@@ -13,21 +14,22 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const session = await getSession(id);
   if (!session) notFound();
+  const venue = resolveVenueDisplay(session);
 
   return (
     <main className="mx-auto w-full max-w-lg pt-6">
       <Link href="/?tab=players" className="text-sm text-gray-400">← Back to players</Link>
       <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-4">
         <div className="flex items-start justify-between">
-          <h1 className="text-lg font-bold">{session.venue.name}</h1>
+          <h1 className="text-lg font-bold">{venue.name}</h1>
           <StatusBadge status={session.status} />
         </div>
         <p className="mt-1 text-sm text-gray-500">
           {formatDateLabel(dateToStr(session.date))} · {session.startTime}–{session.endTime}
         </p>
-        <p className="text-sm text-gray-500">{session.venue.region} · {session.venue.name}</p>
-        {session.venue.availabilityNote && (
-          <p className="mt-1 text-xs text-amber-700">{session.venue.availabilityNote}</p>
+        <p className="text-sm text-gray-500">{venue.region}</p>
+        {venue.availabilityNote && (
+          <p className="mt-1 text-xs text-amber-700">{venue.availabilityNote}</p>
         )}
         <p className="mt-2 text-sm font-medium text-court">
           Needs {session.playersNeeded} player{session.playersNeeded > 1 ? "s" : ""} ·{" "}

@@ -25,29 +25,41 @@ export default async function ManagePage({
   const isGame = posts[0].type === "session";
   const multiple = posts.length > 1;
 
+  const addMoreLink = (
+    <Link
+      href={`/post/${isGame ? "game" : "court"}?batchToken=${token}`}
+      className="mt-4 block w-full rounded-xl border border-dashed border-court py-2.5 text-center text-sm font-semibold text-court"
+    >
+      + Add another {isGame ? "game" : "court"}
+    </Link>
+  );
+
   const list = (
-    <div className="space-y-3">
-      {posts.map((managed) => {
-        const { type, post } = managed;
-        return (
-          <div key={post.id} className="rounded-2xl border border-gray-200 bg-white p-4">
-            <div className="flex items-start justify-between">
-              <h2 className="font-bold">{post.venueName}</h2>
-              <StatusBadge status={post.status} />
+    <>
+      <div className="space-y-3">
+        {posts.map((managed) => {
+          const { type, post } = managed;
+          return (
+            <div key={post.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex items-start justify-between">
+                <h2 className="font-bold">{post.venueName}</h2>
+                <StatusBadge status={post.status} />
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                {formatDateLabel(post.date)} · {post.startTime}–{post.endTime}
+              </p>
+              <p className="mt-1 text-sm font-medium text-court">
+                {type === "listing"
+                  ? formatPrice(post.priceCents ?? null)
+                  : `Needs ${post.playersNeeded} · ${skillRangeLabel(post.skillMin as SkillLevel, post.skillMax as SkillLevel)} · ${formatPrice(post.pricePerPlayerCents ?? null)}/pax`}
+              </p>
+              <ManageActions token={token} post={managed} postCount={posts.length} />
             </div>
-            <p className="mt-1 text-sm text-gray-500">
-              {formatDateLabel(post.date)} · {post.startTime}–{post.endTime}
-            </p>
-            <p className="mt-1 text-sm font-medium text-court">
-              {type === "listing"
-                ? formatPrice(post.priceCents ?? null)
-                : `Needs ${post.playersNeeded} · ${skillRangeLabel(post.skillMin as SkillLevel, post.skillMax as SkillLevel)} · ${formatPrice(post.pricePerPlayerCents ?? null)}/pax`}
-            </p>
-            <ManageActions token={token} post={managed} postCount={posts.length} />
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+      {addMoreLink}
+    </>
   );
 
   return (
@@ -63,13 +75,6 @@ export default async function ManagePage({
       )}
 
       <div className="mt-4">{created ? <SaveLinkGate>{list}</SaveLinkGate> : list}</div>
-
-      <Link
-        href={`/post/${isGame ? "game" : "court"}?batchToken=${token}`}
-        className="mt-4 block w-full rounded-xl border border-dashed border-court py-2.5 text-center text-sm font-semibold text-court"
-      >
-        + Add another {isGame ? "game" : "court"}
-      </Link>
 
       <Link href="/" className="mt-4 block text-center text-sm text-gray-400">← Back to the board</Link>
     </main>

@@ -18,12 +18,14 @@ export type ManagedPost = {
 
 const LISTING_MANAGE_SELECT = {
   id: true, date: true, startTime: true, endTime: true, status: true, notes: true, priceCents: true,
+  customVenueName: true,
   venue: { select: { name: true } },
 } as const;
 
 const SESSION_MANAGE_SELECT = {
   id: true, date: true, startTime: true, endTime: true, status: true, notes: true, pricePerPlayerCents: true,
   playersNeeded: true, skillMin: true, skillMax: true,
+  customVenueName: true,
   venue: { select: { name: true } },
 } as const;
 
@@ -42,14 +44,15 @@ export async function findPostsByBatchToken(token: string): Promise<ManagedPost[
     type: "listing",
     post: {
       id: l.id, date: dateToStr(l.date), startTime: l.startTime, endTime: l.endTime,
-      status: l.status, venueName: l.venue.name, notes: l.notes, priceCents: l.priceCents,
+      status: l.status, venueName: l.venue?.name ?? l.customVenueName ?? "Unlisted venue",
+      notes: l.notes, priceCents: l.priceCents,
     },
   }));
   const sessionPosts: ManagedPost[] = sessions.map((s) => ({
     type: "session",
     post: {
       id: s.id, date: dateToStr(s.date), startTime: s.startTime, endTime: s.endTime,
-      status: s.status, venueName: s.venue.name, notes: s.notes,
+      status: s.status, venueName: s.venue?.name ?? s.customVenueName ?? "Unlisted venue", notes: s.notes,
       pricePerPlayerCents: s.pricePerPlayerCents,
       playersNeeded: s.playersNeeded, skillMin: s.skillMin, skillMax: s.skillMax,
     },

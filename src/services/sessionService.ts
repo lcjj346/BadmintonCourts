@@ -1,15 +1,16 @@
-import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { todaySgt, strToDate } from "@/lib/time";
 import type { BoardFilters, CreateSessionItemInput } from "@/lib/schemas";
-import { ActivePostCapError, sweepExpired } from "@/services/listingService";
+import { sweepExpired } from "@/services/listingService";
+import { assertUnderActiveCap, newBatchToken, createBatch } from "@/services/batchService";
 import { SKILL_ORDER } from "@/lib/skill";
 
-export const PUBLIC_SESSION_SELECT = {
+const PUBLIC_SESSION_SELECT = {
   id: true, date: true, startTime: true, endTime: true,
   playersNeeded: true, skillMin: true, skillMax: true, pricePerPlayerCents: true,
   notes: true, status: true, createdAt: true,
+  customVenueName: true, customRegion: true,
   venue: {
     select: { id: true, name: true, region: true, venueType: true, availabilityNote: true },
   },
@@ -24,7 +25,9 @@ export async function listSessions(filters: BoardFilters): Promise<PublicSession
       date: filters.date ? strToDate(filters.date) : { gte: strToDate(todaySgt()) },
       status: filters.available ? "OPEN" : { in: ["OPEN", "FILLED"] },
       ...(filters.venueId ? { venueId: filters.venueId } : {}),
-      ...(filters.region ? { venue: { region: filters.region } } : {}),
+      ...(filters.region
+        ? { OR: [{ venue: { region: filters.region } }, { customRegion: filters.region }] }
+        : {}),
       ...(filters.timeFrom || filters.timeTo
         ? {
             startTime: {
@@ -52,38 +55,38 @@ export async function getSession(id: string): Promise<PublicSession | null> {
   return prisma.gameSession.findUnique({ where: { id }, select: PUBLIC_SESSION_SELECT });
 }
 
+function sessionCreator(item: CreateSessionItemInput, phone: string, batchToken: string) {
+  return prisma.gameSession.create({
+    data: {
+      venueId: item.venueId,
+      customVenueName: item.customVenueName,
+      customRegion: item.customRegion,
+      date: strToDate(item.date),
+      startTime: item.startTime,
+      endTime: item.endTime,
+      playersNeeded: item.playersNeeded,
+      skillMin: item.skillMin,
+      skillMax: item.skillMax,
+      pricePerPlayerCents: item.pricePerPlayerCents,
+      notes: item.notes,
+      phone,
+      batchToken,
+    },
+    select: { id: true },
+  });
+}
+
 /** Creates every item under one shared batchToken — the manage link for all of them. */
 export async function createSessionBatch(
   items: CreateSessionItemInput[],
   phone: string,
 ): Promise<{ batchToken: string; ids: string[] }> {
-  const active = await prisma.gameSession.count({
-    where: { phone, status: "OPEN" },
-  });
-  if (active + items.length > 5) throw new ActivePostCapError();
+  const active = await prisma.gameSession.count({ where: { phone, status: "OPEN" } });
+  assertUnderActiveCap(active, items.length);
 
-  const batchToken = randomUUID();
-  const rows = await prisma.$transaction(
-    items.map((item) =>
-      prisma.gameSession.create({
-        data: {
-          venueId: item.venueId,
-          date: strToDate(item.date),
-          startTime: item.startTime,
-          endTime: item.endTime,
-          playersNeeded: item.playersNeeded,
-          skillMin: item.skillMin,
-          skillMax: item.skillMax,
-          pricePerPlayerCents: item.pricePerPlayerCents,
-          notes: item.notes,
-          phone,
-          batchToken,
-        },
-        select: { id: true },
-      }),
-    ),
-  );
-  return { batchToken, ids: rows.map((r) => r.id) };
+  const batchToken = newBatchToken();
+  const ids = await createBatch(items.map((item) => sessionCreator(item, phone, batchToken)));
+  return { batchToken, ids };
 }
 
 /** Appends more sessions to an existing manage link, reusing its phone. Null if the token is unknown or scrubbed. */
@@ -96,29 +99,10 @@ export async function addSessionsToBatch(
   const phone = existing.phone;
 
   const active = await prisma.gameSession.count({ where: { phone, status: "OPEN" } });
-  if (active + items.length > 5) throw new ActivePostCapError();
+  assertUnderActiveCap(active, items.length);
 
-  const rows = await prisma.$transaction(
-    items.map((item) =>
-      prisma.gameSession.create({
-        data: {
-          venueId: item.venueId,
-          date: strToDate(item.date),
-          startTime: item.startTime,
-          endTime: item.endTime,
-          playersNeeded: item.playersNeeded,
-          skillMin: item.skillMin,
-          skillMax: item.skillMax,
-          pricePerPlayerCents: item.pricePerPlayerCents,
-          notes: item.notes,
-          phone,
-          batchToken,
-        },
-        select: { id: true },
-      }),
-    ),
-  );
-  return { ids: rows.map((r) => r.id) };
+  const ids = await createBatch(items.map((item) => sessionCreator(item, phone, batchToken)));
+  return { ids };
 }
 
 export async function revealSessionPhone(id: string): Promise<string | null> {

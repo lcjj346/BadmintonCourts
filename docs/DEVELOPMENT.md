@@ -33,8 +33,8 @@ flowchart LR
         ZOD["Zod<br/>input + env validation"]
     end
     subgraph quality ["Quality"]
-        JEST["Jest + RTL<br/>112 tests"]
-        PW["Playwright<br/>core-loop E2E"]
+        JEST["Jest + RTL<br/>unit + component"]
+        PW["Playwright<br/>core-loop E2E · opt-in load test"]
         TSC["tsc --noEmit<br/>required gate"]
     end
     subgraph ops ["Operations"]
@@ -96,10 +96,12 @@ src/
     page.tsx                 Board homepage (Courts | Players tabs, date strip, filters)
     listing/[id]/page.tsx    Court detail + click-to-reveal
     session/[id]/page.tsx    Game detail + click-to-reveal
-    post/                    Chooser + court form + game form (repeatable entries, one manage link)
-    manage/[token]/page.tsx  Secret manage page — lists every post in the batch (edit, mark sold/filled, delete)
+    post/                    Chooser + court form + game form (repeatable entries, one manage link;
+                               also reused to append more posts to an existing manage link)
+    manage/[token]/page.tsx  Secret manage page — lists every post in the batch (edit, mark sold/
+                               filled, revert, delete, add another court/game to the same link)
     venue-request/page.tsx   "Request a venue" form
-    api/                     13 route handlers (listings, sessions, manage, venues, suggestions)
+    api/                     14 route handlers (listings, sessions, manage, venues, suggestions, presence)
   components/                Cards, BottomSheet, DateStrip, FilterBar, VenuePicker, RevealButton, …
   services/                  All Prisma queries live here
   lib/
@@ -112,9 +114,13 @@ src/
     logger.ts                Pino with PII redaction
 prisma/
   schema.prisma              7 models
-  venues.json                458 seeded venues (halls, CCs, DUS schools)
+  venues.json                463 seeded venues (ActiveSG halls, CCs, DUS schools, and a
+                               handful of well-known private venues under OTHER)
   seed.ts                    Idempotent upsert-by-name seeder
-e2e/                         Playwright core-loop happy path
+scripts/
+  loadTestSeed.ts            Seeds/cleans tagged load-test courts+games (local or prod)
+e2e/                         Playwright core-loop happy path (part of CI)
+e2e-load/                    Playwright load test — opt-in only, see Testing
 ```
 
 ### Data models
@@ -122,9 +128,11 @@ e2e/                         Playwright core-loop happy path
 - **Venue** — name, address, postalCode, region (NORTH/SOUTH/EAST/WEST/CENTRAL), venueType
   (SPORTS_HALL/COMMUNITY_CENTRE/SCHOOL/OTHER), optional availabilityNote (e.g. schools:
   "Weekends & school holidays only").
-- **Listing** (a court for sale) — venue, date, start/end time, priceCents (`0`=free,
-  `null`=negotiable), notes, **phone**, status (AVAILABLE/SOLD/EXPIRED), and a **batchToken**
-  (not unique — every post created in the same submission shares one, which is the manage link).
+- **Listing** (a court for sale) — venue OR customVenueName+customRegion (a venue not in our
+  curated list — mutually exclusive, enforced by the create schema), date, start/end time,
+  priceCents (`0`=free, `null`=negotiable), notes, **phone**, status (AVAILABLE/SOLD/EXPIRED),
+  and a **batchToken** (not unique — every post created in the same submission shares one,
+  which is the manage link).
 - **GameSession** (a game seeking players) — like Listing plus playersNeeded, skillMin/skillMax
   (a skill-level range), pricePerPlayerCents; status OPEN/FILLED/EXPIRED.
 - **RateLimitEvent** — hashed IP + action + optional target, for Postgres-backed rate limiting.
@@ -184,9 +192,13 @@ sequenceDiagram
    deep links.
 5. **Manage** — the seller opens their manage link, which lists every post in the batch. Each
    one has its own Edit (date/time/price/notes, and for games, players needed/skill range),
-   "Mark as sold/filled" (`PATCH /api/manage/[token]/[id]`), and Delete (`DELETE`) — every
-   write re-checks that `id` actually belongs to `token` before touching the row. Sold/filled
-   posts stay on the board (badged, sorted last) until their date passes, then auto-expire.
+   "Mark as sold/filled" and its undo "Revert to available/open" (both `PATCH
+   /api/manage/[token]/[id]`), and Delete (`DELETE`) — every write re-checks that `id` actually
+   belongs to `token` before touching the row. Sold/filled posts stay on the board (badged,
+   sorted last) until their date passes, then auto-expire. The manage page also links to
+   "+ Add another court/game", which reopens the post form pre-wired to `POST
+   /api/manage/[token]/items` — it appends to the same `batchToken` and reuses the batch's
+   existing phone, so no phone re-entry and no new manage link.
 
 ### Time handling
 
@@ -202,9 +214,10 @@ imports dayjs). `createdAt`/`updatedAt` remain normal UTC machine timestamps.
 - **Phone numbers never appear in page HTML or list/detail JSON** — only the rate-limited
   reveal endpoint returns them. Enforced structurally by the `PUBLIC_*_SELECT` objects (the
   phone column is physically not selected), so a page literally cannot render it.
-- **Rate limiting** (Postgres-backed, no Redis) — reveals capped per IP+target and globally
-  (limits are generous because Singapore mobile carriers use CGNAT, sharing IPs); posting
-  capped per IP and per phone number.
+- **Rate limiting** (Postgres-backed, no Redis) — reveal: 3/hr per listing+IP, 30/hr + 100/day
+  per IP overall; create (post): 10/hr per IP; report/venue-suggestion: 15/hr per IP; presence
+  heartbeat: 300/hr per IP (limits are generous because Singapore mobile carriers use CGNAT,
+  sharing IPs). See `src/services/rateLimitService.ts` for the source of truth.
 - **Anti-spam** — hidden honeypot field (a filled `website` field silently returns success
   and writes nothing), phone format validation, max 5 active posts per phone.
 - **PDPA-minded** — IPs are stored only as salted SHA-256 hashes; phone numbers are scrubbed
@@ -273,14 +286,19 @@ committed.
 ### Commands
 
 ```bash
-npm run dev          # dev server
-npm run build        # prisma generate + production build (also the deploy gate)
-npm test             # Jest unit + component tests (runs serially against the dev DB)
-npm run test:e2e     # Playwright core-loop happy path
-npx tsc --noEmit     # type-check (Jest uses SWC and does NOT type-check)
-npm run lint         # ESLint
-npm run prod:migrate # apply pending migrations to production (Neon)
-npm run prod:seed    # reseed venues in production (Neon)
+npm run dev              # dev server
+npm run build            # prisma generate + production build (also the deploy gate)
+npm test                 # Jest unit + component tests (runs serially against the dev DB)
+npm run test:e2e         # Playwright core-loop happy path
+npm run test:load        # opt-in: seeds ~300 courts+games and asserts perf ceilings (see Testing)
+npx tsc --noEmit         # type-check (Jest uses SWC and does NOT type-check)
+npm run lint             # ESLint
+npm run prod:migrate     # apply pending migrations to production (Neon)
+npm run prod:seed        # reseed venues in production (Neon)
+npm run loadtest:seed -- 50       # seed N tagged courts+games locally for manual testing (default 50)
+npm run loadtest:cleanup          # remove everything loadtest:seed added, locally
+npm run loadtest:seed:prod -- 50  # same, against production — use deliberately, not by habit
+npm run loadtest:cleanup:prod     # remove load-test rows from production
 ```
 
 ---
@@ -326,11 +344,20 @@ compute after a few minutes of inactivity and wakes itself on the next query —
 
 - **Jest unit** (`src/**/__tests__`) — services (expiry sweep, rate-limit windows, the
   `phone`/`batchToken` omission from public selects), `lib/time.ts` SGT boundaries, Zod schemas.
-  Service tests hit the local Postgres and run serially (`--runInBand`).
+  Service tests hit the local Postgres and run serially (`--runInBand`). Note: this truncates
+  listings/sessions/venues on the DB `.env` points at between tests — see [Keeping local dev
+  separate from production](#keeping-local-dev-separate-from-production); it will also wipe
+  any rows you seeded with `loadtest:seed`, so re-seed after running `npm test` if you need them.
 - **React Testing Library** — cards, bottom sheet, date strip, venue picker, reveal button.
 - **Playwright** (`e2e/core-loop.spec.ts`) — the whole loop: post court → browse → assert
   phone absent → reveal → mark sold; plus a game-board variant. The phone-absence and reveal
-  assertions are the security-critical ones.
+  assertions are the security-critical ones. Runs against the default `playwright.config.ts`
+  and is part of CI.
+- **Playwright load test** (`e2e-load/load.spec.ts`, its own `playwright.load.config.ts`) —
+  opt-in only (`npm run test:load`), never runs in CI. Seeds ~300 courts + 300 games via
+  `scripts/loadTestSeed.ts`, then asserts response-time ceilings on the board GET, posting,
+  revealing a poster's contact, and clicking a court card through to its detail page. Cleans
+  up everything it seeded in `afterAll`.
 
 ---
 
@@ -343,8 +370,13 @@ This is a deliberately lean MVP. Known limitations:
   identity. If abuse appears, the documented next step is SMS OTP on posting (not built).
 - **Trust-based transactions.** Payment and no-shows are entirely off-platform; the app only
   connects people. There is no escrow, rating, or dispute system.
-- **Curated venues only.** You can't type a free-text venue (that would break filtering).
-  Missing venues go through the "Request a venue" form and are added to the seed manually.
+- **Free-text venues can't be filtered by venue.** A poster whose venue isn't in the curated
+  list can enter a name + region and post immediately (`customVenueName`/`customRegion` on
+  Listing/GameSession, `venue: null`) — it shows up under region/date/time filters like any
+  other post, just not under the "Venue" filter (which only lists curated venues) or in venue
+  autocomplete. There's no dedup/normalization on free-text names, so the same real place typed
+  two different ways won't merge. The "Request a venue" form still exists for getting a venue
+  permanently added to the curated list (and thus filterable by venue).
 - **Coarse rate limiting.** Postgres-counted windows with a non-transactional check-then-write;
   a burst could allow an occasional extra reveal. Fine at this scale, not a hardened control.
 - **No realtime.** The board is server-rendered per request; there are no live updates,
