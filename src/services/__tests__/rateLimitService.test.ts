@@ -9,8 +9,8 @@ beforeEach(resetDb);
 afterAll(() => prisma.$disconnect());
 
 describe("rateLimitService", () => {
-  it("allows 5 creates then blocks the 6th", async () => {
-    for (let i = 0; i < 5; i++) {
+  it("allows 10 creates then blocks the 11th", async () => {
+    for (let i = 0; i < 10; i++) {
       await assertCreateAllowed("hashA");
       await recordCreate("hashA");
     }

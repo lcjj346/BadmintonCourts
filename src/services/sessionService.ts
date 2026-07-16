@@ -86,6 +86,41 @@ export async function createSessionBatch(
   return { batchToken, ids: rows.map((r) => r.id) };
 }
 
+/** Appends more sessions to an existing manage link, reusing its phone. Null if the token is unknown or scrubbed. */
+export async function addSessionsToBatch(
+  batchToken: string,
+  items: CreateSessionItemInput[],
+): Promise<{ ids: string[] } | null> {
+  const existing = await prisma.gameSession.findFirst({ where: { batchToken }, select: { phone: true } });
+  if (!existing?.phone) return null;
+  const phone = existing.phone;
+
+  const active = await prisma.gameSession.count({ where: { phone, status: "OPEN" } });
+  if (active + items.length > 5) throw new ActivePostCapError();
+
+  const rows = await prisma.$transaction(
+    items.map((item) =>
+      prisma.gameSession.create({
+        data: {
+          venueId: item.venueId,
+          date: strToDate(item.date),
+          startTime: item.startTime,
+          endTime: item.endTime,
+          playersNeeded: item.playersNeeded,
+          skillMin: item.skillMin,
+          skillMax: item.skillMax,
+          pricePerPlayerCents: item.pricePerPlayerCents,
+          notes: item.notes,
+          phone,
+          batchToken,
+        },
+        select: { id: true },
+      }),
+    ),
+  );
+  return { ids: rows.map((r) => r.id) };
+}
+
 export async function revealSessionPhone(id: string): Promise<string | null> {
   const row = await prisma.gameSession.findUnique({ where: { id }, select: { phone: true } });
   return row?.phone ?? null;

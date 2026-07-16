@@ -20,6 +20,7 @@ export function ManageActions({
   const router = useRouter();
   const { type, post } = managed;
   const closed = post.status === "SOLD" || post.status === "FILLED";
+  const expired = post.status === "EXPIRED";
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
 
@@ -35,6 +36,7 @@ export function ManageActions({
   const [skillMax, setSkillMax] = useState<SkillLevel>((post.skillMax as SkillLevel) ?? "MID_INTERMEDIATE");
 
   const closeLabel = type === "listing" ? "Mark as sold" : "Mark as filled";
+  const reopenLabel = type === "listing" ? "Revert to available" : "Revert to open";
   const priceLabel = type === "listing" ? "Price (SGD)" : "Cost per player (SGD)";
 
   async function act(body: Record<string, unknown>, method: "PATCH" | "DELETE" = "PATCH") {
@@ -61,6 +63,10 @@ export function ManageActions({
 
   async function markClosed() {
     if (await act({ action: "close" })) router.refresh();
+  }
+
+  async function reopen() {
+    if (await act({ action: "reopen" })) router.refresh();
   }
 
   async function remove() {
@@ -247,6 +253,15 @@ export function ManageActions({
             {closeLabel}
           </button>
         </div>
+      )}
+      {closed && !expired && (
+        <button
+          onClick={reopen}
+          disabled={busy}
+          className="w-full rounded-xl border border-court py-2.5 font-semibold text-court disabled:opacity-50"
+        >
+          {reopenLabel}
+        </button>
       )}
       <button
         onClick={remove}

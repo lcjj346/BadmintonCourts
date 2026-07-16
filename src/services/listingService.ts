@@ -115,6 +115,38 @@ export async function createListingBatch(
   return { batchToken, ids: rows.map((r) => r.id) };
 }
 
+/** Appends more listings to an existing manage link, reusing its phone. Null if the token is unknown or scrubbed. */
+export async function addListingsToBatch(
+  batchToken: string,
+  items: CreateListingItemInput[],
+): Promise<{ ids: string[] } | null> {
+  const existing = await prisma.listing.findFirst({ where: { batchToken }, select: { phone: true } });
+  if (!existing?.phone) return null;
+  const phone = existing.phone;
+
+  const active = await prisma.listing.count({ where: { phone, status: "AVAILABLE" } });
+  if (active + items.length > 5) throw new ActivePostCapError();
+
+  const rows = await prisma.$transaction(
+    items.map((item) =>
+      prisma.listing.create({
+        data: {
+          venueId: item.venueId,
+          date: strToDate(item.date),
+          startTime: item.startTime,
+          endTime: item.endTime,
+          priceCents: item.priceCents,
+          notes: item.notes,
+          phone,
+          batchToken,
+        },
+        select: { id: true },
+      }),
+    ),
+  );
+  return { ids: rows.map((r) => r.id) };
+}
+
 export async function revealListingPhone(id: string): Promise<string | null> {
   const row = await prisma.listing.findUnique({ where: { id }, select: { phone: true } });
   return row?.phone ?? null;

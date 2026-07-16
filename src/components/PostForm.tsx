@@ -44,7 +44,14 @@ function makeEntry(key: string): Entry {
   };
 }
 
-export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: VenueOption[] }) {
+export function PostForm({
+  kind, venues, batchToken,
+}: {
+  kind: "court" | "game";
+  venues: VenueOption[];
+  /** When set, entries are appended to this existing manage link instead of starting a new one. */
+  batchToken?: string;
+}) {
   const router = useRouter();
   // A plain incrementing counter (not crypto.randomUUID) so the first entry's key is
   // identical between the server render and the client hydration render — each gets
@@ -94,10 +101,6 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
     }
     setSubmitting(true);
 
-    let local = phone.replace(/\D/g, "");
-    if (countryCode !== "+65") local = local.replace(/^0/, "");
-    const e164 = `${countryCode}${local}`;
-
     const items = entries.map((entry) => {
       const cents = entry.free ? 0 : entry.price === "" ? null : Math.round(parseFloat(entry.price) * 100);
       const endTime = addHoursToTime(entry.startTime, entry.duration);
@@ -114,17 +117,27 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
     });
 
     try {
-      const res = await fetch(kind === "court" ? "/api/listings" : "/api/sessions", {
+      const url = batchToken
+        ? `/api/manage/${batchToken}/items`
+        : kind === "court" ? "/api/listings" : "/api/sessions";
+      const body = batchToken
+        ? { type: kind === "court" ? "listing" : "session", items }
+        : (() => {
+            let local = phone.replace(/\D/g, "");
+            if (countryCode !== "+65") local = local.replace(/^0/, "");
+            return { items, phone: `${countryCode}${local}`, website: "" };
+          })();
+      const res = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ items, phone: e164, website: "" }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok || !json.data) {
         setSubmitting(false);
         return setError(json.error ?? "Something went wrong");
       }
-      router.push(`/manage/${json.data.batchToken}?created=1`);
+      router.push(batchToken ? `/manage/${batchToken}` : `/manage/${json.data.batchToken}?created=1`);
     } catch {
       setSubmitting(false);
       setError("Network error — please try again");
@@ -328,43 +341,53 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
         </button>
       )}
 
-      <label className={label}>Your mobile number</label>
-      <div className="flex gap-2">
-        <select
-          className="w-[5.5rem] shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm"
-          aria-label="Country code"
-          value={countryCode}
-          onChange={(e) => setCountryCode(e.target.value)}
-        >
-          {COUNTRY_CODES.map(([code, cc]) => (
-            <option key={code} value={code}>{`${code} (${cc})`}</option>
-          ))}
-        </select>
-        <input
-          className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base tracking-wide"
-          type="tel"
-          inputMode="numeric"
-          placeholder="9123 4567"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value.replace(/\s/g, ""))}
-          required
-        />
-      </div>
-      <p className="mt-1 text-xs text-gray-400">
-        Shown only to people who tap &quot;Reveal contact&quot;. Deleted 14 days after your post expires.
-        {entries.length > 1 && " One number for all the courts/games above."}
-      </p>
+      {!batchToken && (
+        <>
+          <label className={label}>Your mobile number</label>
+          <div className="flex gap-2">
+            <select
+              className="w-[5.5rem] shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm"
+              aria-label="Country code"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+            >
+              {COUNTRY_CODES.map(([code, cc]) => (
+                <option key={code} value={code}>{`${code} (${cc})`}</option>
+              ))}
+            </select>
+            <input
+              className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base tracking-wide"
+              type="tel"
+              inputMode="numeric"
+              placeholder="9123 4567"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\s/g, ""))}
+              required
+            />
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            Shown only to people who tap &quot;Reveal contact&quot;. Deleted 14 days after your post expires.
+            {entries.length > 1 && " One number for all the courts/games above."}
+          </p>
 
-      {/* honeypot — hidden from real users */}
-      <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
+          {/* honeypot — hidden from real users */}
+          <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
+        </>
+      )}
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
-        After posting you&apos;ll get a <strong>private manage link</strong> — it&apos;s the only
-        way to edit, mark as {kind === "court" ? "sold" : "filled"}, or delete{" "}
-        {entries.length > 1 ? "these posts" : "your post"}. Save it before sharing.
-      </div>
+      {batchToken ? (
+        <div className="mt-5 rounded-xl bg-court-light p-3 text-sm text-court">
+          This will be added to your existing manage link — same number, same page.
+        </div>
+      ) : (
+        <div className="mt-5 rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
+          After posting you&apos;ll get a <strong>private manage link</strong> — it&apos;s the only
+          way to edit, mark as {kind === "court" ? "sold" : "filled"}, or delete{" "}
+          {entries.length > 1 ? "these posts" : "your post"}. Save it before sharing.
+        </div>
+      )}
 
       <button
         type="submit"
@@ -373,11 +396,13 @@ export function PostForm({ kind, venues }: { kind: "court" | "game"; venues: Ven
       >
         {submitting
           ? "Posting…"
-          : entries.length > 1
-            ? `Post ${entries.length} ${kind === "court" ? "courts" : "games"}`
-            : kind === "court"
-              ? "Post court"
-              : "Post game"}
+          : batchToken
+            ? `Add ${entries.length > 1 ? `${entries.length} ${kind === "court" ? "courts" : "games"}` : kind === "court" ? "court" : "game"}`
+            : entries.length > 1
+              ? `Post ${entries.length} ${kind === "court" ? "courts" : "games"}`
+              : kind === "court"
+                ? "Post court"
+                : "Post game"}
       </button>
     </form>
   );
