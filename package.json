@@ -14,8 +14,8 @@
     "test:load:prod": "dotenv -e .env.production.local -- playwright test --config=playwright.load.prod.config.ts",
     "prod:migrate": "dotenv -e .env.production.local -- npx prisma migrate deploy",
     "prod:seed": "dotenv -e .env.production.local -- npx prisma db seed",
-    "loadtest:seed": "ts-node scripts/loadTestSeed.ts",
-    "loadtest:cleanup": "ts-node scripts/loadTestSeed.ts --cleanup",
+    "loadtest:seed": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" scripts/loadTestSeed.ts",
+    "loadtest:cleanup": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" scripts/loadTestSeed.ts --cleanup",
     "loadtest:seed:prod": "dotenv -e .env.production.local -- npm run loadtest:seed --",
     "loadtest:cleanup:prod": "dotenv -e .env.production.local -- npm run loadtest:cleanup"
   },
@@ -31,11 +31,12 @@
     "zod": "^3.25.76"
   },
   "prisma": {
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "ts-node --transpile-only --compiler-options {\"module\":\"CommonJS\",\"moduleResolution\":\"node\"} prisma/seed.ts"
   },
   "ts-node": {
     "compilerOptions": {
-      "module": "CommonJS"
+      "module": "CommonJS",
+      "moduleResolution": "node"
     }
   },
   "devDependencies": {
