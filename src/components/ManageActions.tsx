@@ -15,9 +15,9 @@ function durationFromTimes(startTime: string, endTime: string): number {
 }
 
 export function ManageActions({
-  token, post: managed, postCount,
+  token, post: managed, onDeleted,
 }: {
-  token: string; post: ManagedPost; postCount: number;
+  token: string; post: ManagedPost; onDeleted: () => void;
 }) {
   const router = useRouter();
   const { type, post } = managed;
@@ -84,9 +84,12 @@ export function ManageActions({
   async function remove() {
     setConfirmDelete(false);
     if (!(await act({}, "DELETE"))) return;
-    // Deleting the last post in the batch leaves nothing to manage — back to the board.
-    if (postCount <= 1) router.push("/");
-    else router.refresh();
+    // Removed from the DOM immediately by the parent's local state — no waiting on a
+    // router.refresh() RSC round-trip, which under load could lag well past a moment
+    // where the count still visibly reads stale. router.refresh() still runs in the
+    // background so the server-rendered cache doesn't drift for later navigations.
+    onDeleted();
+    router.refresh();
   }
 
   async function saveEdit(e: React.FormEvent) {
