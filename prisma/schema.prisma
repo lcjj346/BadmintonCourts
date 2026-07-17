@@ -85,6 +85,8 @@ model Listing {
   @@index([date, status])
   @@index([venueId])
   @@index([batchToken])
+  @@index([phone, status])          // active-post-cap count (contactWhere) — full scan-free at scale
+  @@index([telegramHandle, status]) // same, for Telegram-only posters
 }
 
 model GameSession {
@@ -111,6 +113,8 @@ model GameSession {
   @@index([date, status])
   @@index([venueId])
   @@index([batchToken])
+  @@index([phone, status])
+  @@index([telegramHandle, status])
 }
 
 model RateLimitEvent {
