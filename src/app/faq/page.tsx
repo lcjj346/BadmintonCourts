@@ -50,7 +50,10 @@ export default function FaqPage() {
         <Card title="How long does a post last?">
           <p>
             A post stays visible until its start time passes, then it expires automatically.
-            Sold or filled posts remain visible (with a badge) until their start time passes.
+          </p>
+          <p>
+            Marked it sold or filled? It stays visible with a badge for 1 hour as a grace period,
+            then it&apos;s automatically removed even if you forget to delete it yourself.
           </p>
           <p>Phone numbers are permanently deleted 14 days after a post expires.</p>
         </Card>

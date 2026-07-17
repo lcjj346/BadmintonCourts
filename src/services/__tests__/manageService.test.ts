@@ -5,7 +5,7 @@ import { todaySgt } from "@/lib/time";
 import { createListingBatch } from "@/services/listingService";
 import { createSessionBatch } from "@/services/sessionService";
 import {
-  findPostsByBatchToken, closePost, deletePost, updatePlayersNeeded, editListing, editSession,
+  findPostsByBatchToken, closePost, reopenPost, deletePost, updatePlayersNeeded, editListing, editSession,
 } from "@/services/manageService";
 
 beforeEach(resetDb);
@@ -60,6 +60,20 @@ describe("manageService", () => {
     const [{ post }] = await findPostsByBatchToken(s.batchToken);
     expect(await closePost(s.batchToken, "session", post.id)).toBe(true);
     expect((await prisma.gameSession.findFirstOrThrow()).status).toBe("FILLED");
+  });
+
+  it("closePost stamps closedAt; reopenPost clears it", async () => {
+    const venue = await makeVenue();
+    const l = await createListingBatch([listingItem(venue.id)] as never, { phone: "+6591234567" });
+    const [{ post }] = await findPostsByBatchToken(l.batchToken);
+
+    await closePost(l.batchToken, "listing", post.id);
+    expect((await prisma.listing.findFirstOrThrow()).closedAt).not.toBeNull();
+
+    await reopenPost(l.batchToken, "listing", post.id);
+    const row = await prisma.listing.findFirstOrThrow();
+    expect(row.status).toBe("AVAILABLE");
+    expect(row.closedAt).toBeNull();
   });
 
   it("a token can't act on a row from a different batch", async () => {

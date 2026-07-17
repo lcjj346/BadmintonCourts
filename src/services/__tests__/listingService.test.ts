@@ -117,6 +117,25 @@ describe("listingService", () => {
     expect((await prisma.listing.findUniqueOrThrow({ where: { id } })).status).toBe("EXPIRED");
   });
 
+  it("sweep auto-expires a SOLD listing 1 hour after it was closed, but not sooner", async () => {
+    const venue = await makeVenue();
+    const { id: staleId } = await createListing(input(venue.id));
+    const { id: freshId } = await createListing(input(venue.id, { phone: "+6581234567" }));
+    await prisma.listing.update({
+      where: { id: staleId },
+      data: { status: "SOLD", closedAt: new Date(Date.now() - 61 * 60 * 1000) },
+    });
+    await prisma.listing.update({
+      where: { id: freshId },
+      data: { status: "SOLD", closedAt: new Date(Date.now() - 5 * 60 * 1000) },
+    });
+
+    await sweepExpired();
+
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: staleId } })).status).toBe("EXPIRED");
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: freshId } })).status).toBe("SOLD");
+  });
+
   it("board hides expired, keeps SOLD visible sorted last", async () => {
     const venue = await makeVenue();
     const { id: soldId } = await createListing(input(venue.id, { startTime: "07:00", endTime: "09:00" }));
