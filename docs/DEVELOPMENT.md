@@ -296,7 +296,7 @@ committed.
 
 ```bash
 npm run dev              # dev server
-npm run build            # prisma generate + production build (also the deploy gate)
+npm run build             # prisma generate + prisma migrate deploy + production build (the deploy gate)
 npm test                 # Jest unit + component tests (runs serially against the dev DB)
 npm run test:e2e         # Playwright core-loop happy path
 npm run test:load        # opt-in: seeds ~300 courts+games and asserts perf ceilings (see Testing)
@@ -339,10 +339,11 @@ compute after a few minutes of inactivity and wakes itself on the next query —
    `DATABASE_URL` (pooled), `DIRECT_URL` (direct), `IP_HASH_SALT` (`openssl rand -hex 32`,
    don't reuse your local dev value).
 5. **Deploy** (`npx vercel --prod` or push to the connected branch). The build script runs
-   `prisma generate && next build`, so the deployed Prisma Client always matches
-   `schema.prisma` — don't drop the `prisma generate` step even if it looks redundant with
-   `npm ci`'s own postinstall, since a cached `node_modules` on Vercel can otherwise ship a
-   stale client after a schema change.
+   `prisma generate && prisma migrate deploy && next build`, so the deployed Prisma Client
+   always matches `schema.prisma` and the database schema is always migrated before the new
+   code that expects it goes live — don't drop the `prisma generate` step even if it looks
+   redundant with `npm ci`'s own postinstall, since a cached `node_modules` on Vercel can
+   otherwise ship a stale client after a schema change.
 6. **Smoke test** on the production URL: post a listing, reveal it from another browser, mark
    it sold, delete it. Confirm `/api/listings` responses contain no `phone` field.
 7. **Region latency**: if the app feels slow, check that your Vercel project's function region
@@ -384,10 +385,19 @@ never data loss or corruption.
   separate from production](#keeping-local-dev-separate-from-production); it will also wipe
   any rows you seeded with `loadtest:seed`, so re-seed after running `npm test` if you need them.
 - **React Testing Library** — cards, bottom sheet, date strip, venue picker, reveal button.
-- **Playwright** (`e2e/core-loop.spec.ts`) — the whole loop: post court → browse → assert
-  phone absent → reveal → mark sold; plus a game-board variant. The phone-absence and reveal
-  assertions are the security-critical ones. Runs against the default `playwright.config.ts`
-  and is part of CI.
+- **Playwright** (`e2e/core-loop.spec.ts`, part of CI) — 7 scenarios: court post → browse →
+  assert phone absent → reveal → mark sold; the same loop for a game; posting two courts in
+  one batch; the "add another court" save-link re-gate; posting at a venue not in the curated
+  list; posting with only a Telegram handle (no phone); editing a post's contact from phone to
+  Telegram. The phone-absence and reveal assertions are the security-critical ones. A
+  `beforeEach` wipes listings/sessions/rate-limit-events before *every* test attempt (not just
+  once for the whole run) so a failed attempt's leftovers can never bleed into a later test or
+  a retry. In CI, `playwright.config.ts` runs this against a production build (`npm run start`)
+  instead of `npm run dev`, with 2 retries — locally it's `npm run dev`, retry-free, for fast
+  iteration. `playwright.config.ts` also forces the local test database into the server's env
+  explicitly (see [Keeping local dev separate from production](#keeping-local-dev-separate-from-production))
+  so a local `CI=1` run can never accidentally hit production, regardless of what
+  `.env.production.local` happens to contain on your machine.
 - **Playwright load test** (`e2e-load/load.spec.ts`, its own `playwright.load.config.ts`) —
   opt-in only (`npm run test:load`), never runs in CI. Seeds ~300 courts + 300 games via
   `scripts/loadTestSeed.ts`, then asserts response-time ceilings on the board GET, posting,

@@ -7,9 +7,11 @@ Telegram group and hope someone scrolls past it" workflow with a searchable, fil
 **[Try it live →](https://badminton-courts-sable.vercel.app/)**
 
 - **Courts** — a seller posts a court slot (venue, date, time, price); a buyer browses,
-  filters, opens a listing, reveals the seller's phone, and contacts them directly.
+  filters, opens a listing, reveals the seller's phone or Telegram, and contacts them directly.
 - **Players** — a host posts a game that needs players (venue, date, skill level, cost per
   player); players find it the same way.
+- A poster shares a phone number, a Telegram handle, or both — whichever they're comfortable
+  giving out. Every listing also links out to the venue on Google Maps.
 
 Everything after the match — payment, coordination — happens off-platform over the phone/WhatsApp.
 There are no accounts, no payments, and no chat inside the app.
@@ -54,8 +56,8 @@ number to call". No sign-up friction, no login, used courtside on a phone.
    edit or close that post later.
 2. **Browse** — anyone can filter the board by date, region, venue, time, and (for games)
    skill level, without seeing anyone's phone number.
-3. **Reveal** — tapping "Reveal contact" on a listing shows the poster's phone number, with
-   one-tap `tel:` and WhatsApp links.
+3. **Reveal** — tapping "Reveal contact" on a listing shows whatever the poster gave: a phone
+   number with one-tap `tel:` and WhatsApp links, a Telegram handle with a `t.me` link, or both.
 4. **Connect off-platform** — the rest (payment, meeting up, confirming) happens over the
    phone or WhatsApp, the same way it always has.
 
