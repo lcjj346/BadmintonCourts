@@ -27,7 +27,10 @@ export function VenuePicker({
         onChange={(e) => setQ(e.target.value)}
         className="mb-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
       />
-      <div className="max-h-72 overflow-y-auto">
+      {/* data-lenis-prevent: this list scrolls internally inside a BottomSheet — without
+          it, Lenis's global wheel-event interception can hijack a scroll here into
+          scrolling the page behind the sheet instead. */}
+      <div className="max-h-72 overflow-y-auto" data-lenis-prevent>
         {selectedId && (
           <button onClick={() => onSelect(null)} className="mb-2 text-sm text-court underline">
             Clear venue filter
