@@ -85,7 +85,7 @@ export function ManageActions({
   // Quick +/- stepper beside "Mark as filled" — updates just playersNeeded via the
   // existing updatePlayers action, without opening the full edit form for a change
   // the poster is likely to make several times as spots fill up.
-  const paxCap = post.maxPax ?? 50;
+  const paxCap = post.maxPax ?? 30;
   async function adjustPlayersNeeded(delta: number) {
     const next = Math.min(paxCap, Math.max(1, playersNeeded + delta));
     if (next === playersNeeded) return;
