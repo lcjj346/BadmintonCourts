@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { todaySgt, strToDate } from "@/lib/time";
 import type { BoardFilters, CreateSessionItemInput } from "@/lib/schemas";
 import { sweepExpired } from "@/services/listingService";
-import { assertUnderActiveCap, newBatchToken, createBatch, contactWhere, type Contact } from "@/services/batchService";
+import { assertUnderActiveCap, newBatchToken, withContactLock, contactWhere, type Contact } from "@/services/batchService";
 import { SKILL_ORDER } from "@/lib/skill";
 
 const PUBLIC_SESSION_SELECT = {
@@ -60,8 +60,13 @@ export async function getSession(id: string): Promise<PublicSession | null> {
   return prisma.gameSession.findUnique({ where: { id }, select: PUBLIC_SESSION_SELECT });
 }
 
-function sessionCreator(item: CreateSessionItemInput, contact: Contact, batchToken: string) {
-  return prisma.gameSession.create({
+function sessionCreator(
+  db: Prisma.TransactionClient,
+  item: CreateSessionItemInput,
+  contact: Contact,
+  batchToken: string,
+) {
+  return db.gameSession.create({
     data: {
       venueId: item.venueId,
       customVenueName: item.customVenueName,
@@ -88,12 +93,14 @@ export async function createSessionBatch(
   items: CreateSessionItemInput[],
   contact: Contact,
 ): Promise<{ batchToken: string; ids: string[] }> {
-  const active = await prisma.gameSession.count({ where: { ...contactWhere(contact), status: "OPEN" } });
-  assertUnderActiveCap(active, items.length);
+  return withContactLock(contact, async (tx) => {
+    const active = await tx.gameSession.count({ where: { ...contactWhere(contact), status: "OPEN" } });
+    assertUnderActiveCap(active, items.length);
 
-  const batchToken = newBatchToken();
-  const ids = await createBatch(items.map((item) => sessionCreator(item, contact, batchToken)));
-  return { batchToken, ids };
+    const batchToken = newBatchToken();
+    const rows = await Promise.all(items.map((item) => sessionCreator(tx, item, contact, batchToken)));
+    return { batchToken, ids: rows.map((r) => r.id) };
+  });
 }
 
 /** Appends more sessions to an existing manage link, reusing its contact info. Null if the token is unknown or scrubbed. */
@@ -107,11 +114,13 @@ export async function addSessionsToBatch(
   if (!existing || (!existing.phone && !existing.telegramHandle)) return null;
   const contact: Contact = { phone: existing.phone ?? undefined, telegramHandle: existing.telegramHandle ?? undefined };
 
-  const active = await prisma.gameSession.count({ where: { ...contactWhere(contact), status: "OPEN" } });
-  assertUnderActiveCap(active, items.length);
+  return withContactLock(contact, async (tx) => {
+    const active = await tx.gameSession.count({ where: { ...contactWhere(contact), status: "OPEN" } });
+    assertUnderActiveCap(active, items.length);
 
-  const ids = await createBatch(items.map((item) => sessionCreator(item, contact, batchToken)));
-  return { ids };
+    const rows = await Promise.all(items.map((item) => sessionCreator(tx, item, contact, batchToken)));
+    return { ids: rows.map((r) => r.id) };
+  });
 }
 
 export async function revealSessionContact(id: string): Promise<Contact | null> {

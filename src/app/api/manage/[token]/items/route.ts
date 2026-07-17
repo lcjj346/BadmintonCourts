@@ -4,7 +4,7 @@ import { addListingBatchItemsSchema, addSessionBatchItemsSchema } from "@/lib/sc
 import { getClientIp, hashIp } from "@/lib/ip";
 import { addListingsToBatch } from "@/services/listingService";
 import { addSessionsToBatch } from "@/services/sessionService";
-import { assertCreateAllowed, recordCreate } from "@/services/rateLimitService";
+import { assertAndRecordCreate } from "@/services/rateLimitService";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -24,14 +24,13 @@ export async function POST(req: Request, ctx: Ctx) {
     // unlike every other create path — so a held token could be used to
     // hammer create/delete cycles. Same CREATE bucket as the main routes.
     const ipHash = hashIp(getClientIp(req));
-    await assertCreateAllowed(ipHash);
+    await assertAndRecordCreate(ipHash);
 
     if (type.data === "listing") {
       const parsed = addListingBatchItemsSchema.safeParse(body);
       if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid input", 400);
       const result = await addListingsToBatch(token, parsed.data.items);
       if (!result) return fail("Not found", 404);
-      await recordCreate(ipHash);
       return ok(result, 201);
     }
 
@@ -39,7 +38,6 @@ export async function POST(req: Request, ctx: Ctx) {
     if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid input", 400);
     const result = await addSessionsToBatch(token, parsed.data.items);
     if (!result) return fail("Not found", 404);
-    await recordCreate(ipHash);
     return ok(result, 201);
   } catch (e) {
     return handleError(e);
