@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Analytics } from "@vercel/analytics/react";
+import { SmoothScroll } from "@/components/SmoothScroll";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className="min-h-screen bg-paper text-gray-900 antialiased">
+        <SmoothScroll />
         <header className="sticky top-0 z-40 border-b border-court/10 bg-paper/85 backdrop-blur-md">
           <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3 md:max-w-3xl lg:max-w-5xl">
             <Wordmark />
