@@ -78,6 +78,7 @@ model Listing {
   phone           String?                          // nullable: scrubbed post-expiry (§7). NEVER in public selects
   telegramHandle  String?                          // alternative to phone (at least one required) — same reveal/scrub rules
   status          ListingStatus @default(AVAILABLE)
+  closedAt        DateTime?                        // when marked SOLD; null again if reopened — drives the 1hr auto-expiry
   batchToken      String        @default(uuid())   // shared by every post created in the same submission — the manage-link secret
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -87,6 +88,7 @@ model Listing {
   @@index([batchToken])
   @@index([phone, status])          // active-post-cap count (contactWhere) — full scan-free at scale
   @@index([telegramHandle, status]) // same, for Telegram-only posters
+  @@index([status, closedAt])       // sweepExpired's 1hr-after-close check
 }
 
 model GameSession {
@@ -106,6 +108,7 @@ model GameSession {
   phone               String?             // same scrubbing + select rules as Listing
   telegramHandle      String?             // alternative to phone (at least one required)
   status              SessionStatus @default(OPEN)
+  closedAt            DateTime?                        // when marked FILLED; null again if reopened — drives the 1hr auto-expiry
   batchToken          String        @default(uuid())  // shared by every post created in the same submission — the manage-link secret
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
@@ -115,6 +118,7 @@ model GameSession {
   @@index([batchToken])
   @@index([phone, status])
   @@index([telegramHandle, status])
+  @@index([status, closedAt])       // sweepExpired's 1hr-after-close check
 }
 
 model RateLimitEvent {

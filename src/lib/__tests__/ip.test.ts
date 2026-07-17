@@ -14,6 +14,13 @@ describe("ip", () => {
     expect(getClientIp(req)).toBe("9.9.9.9");
   });
 
+  it("getClientIp prefers x-vercel-forwarded-for over x-forwarded-for", () => {
+    const req = new Request("http://x", {
+      headers: { "x-vercel-forwarded-for": "1.1.1.1", "x-forwarded-for": "9.9.9.9" },
+    });
+    expect(getClientIp(req)).toBe("1.1.1.1");
+  });
+
   it("getClientIp falls back to 'unknown'", () => {
     expect(getClientIp(new Request("http://x"))).toBe("unknown");
   });

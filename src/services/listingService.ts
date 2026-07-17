@@ -19,19 +19,28 @@ const PUBLIC_LISTING_SELECT = {
 
 export type PublicListing = Prisma.ListingGetPayload<{ select: typeof PUBLIC_LISTING_SELECT }>;
 
-const DAY_MS = 24 * 3600 * 1000;
+const HOUR_MS = 3600 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
-/** On-read sweep: expire past posts, scrub stale phones, prune rate-limit events. */
+/** On-read sweep: expire past/long-closed posts, scrub stale phones, prune rate-limit events. */
 export async function sweepExpired(): Promise<void> {
   const today = strToDate(todaySgt());
   const now = nowSgtTime();
   const scrubBefore = new Date(today.getTime() - 14 * DAY_MS);
   const pruneBefore = new Date(Date.now() - DAY_MS);
+  const closedBefore = new Date(Date.now() - HOUR_MS);
 
-  // A slot expires once its start time passes: past dates, or today with startTime <= now (SGT).
+  // A slot expires once its start time passes (past dates, or today with startTime <= now SGT),
+  // or once it's been marked SOLD/FILLED for over an hour without the poster removing it —
+  // closedAt is only set while status is SOLD/FILLED, so this OR branch is a no-op for
+  // AVAILABLE/OPEN rows.
   const expiredWhere = {
     status: { not: "EXPIRED" as const },
-    OR: [{ date: { lt: today } }, { date: today, startTime: { lte: now } }],
+    OR: [
+      { date: { lt: today } },
+      { date: today, startTime: { lte: now } },
+      { closedAt: { lt: closedBefore } },
+    ],
   };
 
   await Promise.all([

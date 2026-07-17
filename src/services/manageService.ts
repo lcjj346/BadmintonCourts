@@ -82,25 +82,26 @@ export async function updatePlayersNeeded(token: string, id: string, playersNeed
   return true;
 }
 
+/** Marking sold/filled starts the 1hr auto-expiry sweep in listingService.sweepExpired. */
 export async function closePost(token: string, type: "listing" | "session", id: string): Promise<boolean> {
   if (type === "listing") {
     if (!(await ownedListing(token, id))) return false;
-    await prisma.listing.update({ where: { id }, data: { status: "SOLD" } });
+    await prisma.listing.update({ where: { id }, data: { status: "SOLD", closedAt: new Date() } });
   } else {
     if (!(await ownedSession(token, id))) return false;
-    await prisma.gameSession.update({ where: { id }, data: { status: "FILLED" } });
+    await prisma.gameSession.update({ where: { id }, data: { status: "FILLED", closedAt: new Date() } });
   }
   return true;
 }
 
-/** Undoes an accidental "mark as sold/filled" click. */
+/** Undoes an accidental "mark as sold/filled" click — also cancels the 1hr auto-expiry. */
 export async function reopenPost(token: string, type: "listing" | "session", id: string): Promise<boolean> {
   if (type === "listing") {
     if (!(await ownedListing(token, id))) return false;
-    await prisma.listing.update({ where: { id }, data: { status: "AVAILABLE" } });
+    await prisma.listing.update({ where: { id }, data: { status: "AVAILABLE", closedAt: null } });
   } else {
     if (!(await ownedSession(token, id))) return false;
-    await prisma.gameSession.update({ where: { id }, data: { status: "OPEN" } });
+    await prisma.gameSession.update({ where: { id }, data: { status: "OPEN", closedAt: null } });
   }
   return true;
 }
