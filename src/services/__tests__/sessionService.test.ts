@@ -107,6 +107,17 @@ describe("sessionService", () => {
     expect(await revealSessionContact(id)).toEqual({ phone: "+6591234567", telegramHandle: undefined });
   });
 
+  it("reveal returns null for a FILLED or EXPIRED session, even with a valid id", async () => {
+    const venue = await makeVenue();
+    const { id: filledId } = await createSession(input(venue.id));
+    await prisma.gameSession.update({ where: { id: filledId }, data: { status: "FILLED" } });
+    expect(await revealSessionContact(filledId)).toBeNull();
+
+    const { id: expiredId } = await createSession(input(venue.id, { phone: "+6581234567" }));
+    await prisma.gameSession.update({ where: { id: expiredId }, data: { status: "EXPIRED" } });
+    expect(await revealSessionContact(expiredId)).toBeNull();
+  });
+
   // Status ordering must dominate startTime ordering: an OPEN game always lists before a
   // FILLED one, even when the OPEN game starts later. Postgres native enums sort by declared
   // order (OPEN, FILLED, EXPIRED), so `orderBy: [{ status: "asc" }, ...]` puts OPEN first.

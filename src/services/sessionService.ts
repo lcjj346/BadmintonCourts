@@ -123,8 +123,11 @@ export async function addSessionsToBatch(
   });
 }
 
+// Only an OPEN session reveals its contact — same reasoning as revealListingContact
+// in listingService.ts: the UI hides "Reveal" once a post is FILLED/EXPIRED, but that's
+// client-side only, so the API needs its own check against a direct hit with a stale id.
 export async function revealSessionContact(id: string): Promise<Contact | null> {
-  const row = await prisma.gameSession.findUnique({ where: { id }, select: { phone: true, telegramHandle: true } });
-  if (!row) return null;
+  const row = await prisma.gameSession.findUnique({ where: { id }, select: { phone: true, telegramHandle: true, status: true } });
+  if (!row || row.status !== "OPEN") return null;
   return { phone: row.phone ?? undefined, telegramHandle: row.telegramHandle ?? undefined };
 }

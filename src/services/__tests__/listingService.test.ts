@@ -198,6 +198,17 @@ describe("listingService", () => {
     expect(await revealListingContact(id)).toEqual({ phone: "+6591234567", telegramHandle: undefined });
   });
 
+  it("reveal returns null for a SOLD or EXPIRED listing, even with a valid id", async () => {
+    const venue = await makeVenue();
+    const { id: soldId } = await createListing(input(venue.id));
+    await prisma.listing.update({ where: { id: soldId }, data: { status: "SOLD" } });
+    expect(await revealListingContact(soldId)).toBeNull();
+
+    const { id: expiredId } = await createListing(input(venue.id, { phone: "+6581234567" }));
+    await prisma.listing.update({ where: { id: expiredId }, data: { status: "EXPIRED" } });
+    expect(await revealListingContact(expiredId)).toBeNull();
+  });
+
   it("with no date filter, returns all upcoming dates ordered by date then status then startTime", async () => {
     const venue = await makeVenue();
     const dayAfter = dayjs(todaySgt()).add(2, "day").format("YYYY-MM-DD");

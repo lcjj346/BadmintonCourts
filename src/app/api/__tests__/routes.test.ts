@@ -64,6 +64,10 @@ describe("listings API", () => {
     expect(mp.status).toBe(200);
     expect((await prisma.listing.findFirstOrThrow()).status).toBe("SOLD");
 
+    // Once SOLD, a direct reveal hit (bypassing the UI, which hides the button) 404s.
+    const revealAfterSold = await revealRoute(req(`http://x/api/listings/${id}/reveal`, "POST"), params({ id }));
+    expect(revealAfterSold.status).toBe(404);
+
     const md = await manageDelete(
       req(`http://x/api/manage/${data.batchToken}/${id}`, "DELETE", { type: "listing" }),
       params({ token: data.batchToken, id }),
