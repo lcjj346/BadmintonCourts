@@ -28,10 +28,24 @@ export function contactWhere(contact: Contact): { phone: string } | { telegramHa
   return contact.phone ? { phone: contact.phone } : { telegramHandle: contact.telegramHandle! };
 }
 
-/** Runs one `.create()` per item in a single transaction, returning their ids in order. */
-export async function createBatch(
-  creators: Prisma.PrismaPromise<{ id: string }>[],
-): Promise<string[]> {
-  const rows = await prisma.$transaction(creators);
-  return rows.map((r) => r.id);
+/**
+ * Runs `fn` inside a transaction holding a Postgres advisory lock keyed on the
+ * contact's phone/Telegram handle — this is what actually makes the active-post
+ * cap enforceable. Without it, two concurrent create/add-to-batch requests for
+ * the same contact each count the same "active so far" number before either has
+ * committed its own rows, so both can pass the cap check and together land well
+ * over ACTIVE_POST_CAP. The lock serializes requests for the SAME contact only;
+ * unrelated posters are never blocked by each other. `pg_advisory_xact_lock`
+ * auto-releases when the transaction ends (commit or rollback), so a thrown
+ * ActivePostCapError still releases the lock correctly.
+ */
+export async function withContactLock<T>(
+  contact: Contact,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  const key = contact.phone ?? contact.telegramHandle!;
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+    return fn(tx);
+  });
 }

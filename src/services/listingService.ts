@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { todaySgt, strToDate, nowSgtTime } from "@/lib/time";
 import type { BoardFilters, CreateListingItemInput } from "@/lib/schemas";
 import {
-  assertUnderActiveCap, newBatchToken, createBatch, contactWhere, ActivePostCapError, type Contact,
+  assertUnderActiveCap, newBatchToken, withContactLock, contactWhere, ActivePostCapError, type Contact,
 } from "@/services/batchService";
 
 export { ActivePostCapError };
@@ -95,8 +95,13 @@ export async function getListing(id: string): Promise<PublicListing | null> {
   return prisma.listing.findUnique({ where: { id }, select: PUBLIC_LISTING_SELECT });
 }
 
-function listingCreator(item: CreateListingItemInput, contact: Contact, batchToken: string) {
-  return prisma.listing.create({
+function listingCreator(
+  db: Prisma.TransactionClient,
+  item: CreateListingItemInput,
+  contact: Contact,
+  batchToken: string,
+) {
+  return db.listing.create({
     data: {
       venueId: item.venueId,
       customVenueName: item.customVenueName,
@@ -119,12 +124,14 @@ export async function createListingBatch(
   items: CreateListingItemInput[],
   contact: Contact,
 ): Promise<{ batchToken: string; ids: string[] }> {
-  const active = await prisma.listing.count({ where: { ...contactWhere(contact), status: "AVAILABLE" } });
-  assertUnderActiveCap(active, items.length);
+  return withContactLock(contact, async (tx) => {
+    const active = await tx.listing.count({ where: { ...contactWhere(contact), status: "AVAILABLE" } });
+    assertUnderActiveCap(active, items.length);
 
-  const batchToken = newBatchToken();
-  const ids = await createBatch(items.map((item) => listingCreator(item, contact, batchToken)));
-  return { batchToken, ids };
+    const batchToken = newBatchToken();
+    const rows = await Promise.all(items.map((item) => listingCreator(tx, item, contact, batchToken)));
+    return { batchToken, ids: rows.map((r) => r.id) };
+  });
 }
 
 /** Appends more listings to an existing manage link, reusing its contact info. Null if the token is unknown or scrubbed. */
@@ -138,11 +145,13 @@ export async function addListingsToBatch(
   if (!existing || (!existing.phone && !existing.telegramHandle)) return null;
   const contact: Contact = { phone: existing.phone ?? undefined, telegramHandle: existing.telegramHandle ?? undefined };
 
-  const active = await prisma.listing.count({ where: { ...contactWhere(contact), status: "AVAILABLE" } });
-  assertUnderActiveCap(active, items.length);
+  return withContactLock(contact, async (tx) => {
+    const active = await tx.listing.count({ where: { ...contactWhere(contact), status: "AVAILABLE" } });
+    assertUnderActiveCap(active, items.length);
 
-  const ids = await createBatch(items.map((item) => listingCreator(item, contact, batchToken)));
-  return { ids };
+    const rows = await Promise.all(items.map((item) => listingCreator(tx, item, contact, batchToken)));
+    return { ids: rows.map((r) => r.id) };
+  });
 }
 
 export async function revealListingContact(id: string): Promise<Contact | null> {

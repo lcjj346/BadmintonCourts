@@ -2,7 +2,7 @@ import { ok, fail, handleError } from "@/lib/api";
 import { boardFilterSchema, createSessionSchema } from "@/lib/schemas";
 import { getClientIp, hashIp } from "@/lib/ip";
 import { listSessions, createSessionBatch } from "@/services/sessionService";
-import { assertCreateAllowed, recordCreate } from "@/services/rateLimitService";
+import { assertAndRecordCreate } from "@/services/rateLimitService";
 
 export async function GET(req: Request) {
   try {
@@ -25,11 +25,10 @@ export async function POST(req: Request) {
       return fail(issue?.message ?? "Invalid input", 400);
     }
     const ipHash = hashIp(getClientIp(req));
-    await assertCreateAllowed(ipHash);
+    await assertAndRecordCreate(ipHash);
     const created = await createSessionBatch(body.data.items, {
       phone: body.data.phone, telegramHandle: body.data.telegramHandle,
     });
-    await recordCreate(ipHash);
     return ok(created, 201);
   } catch (e) {
     return handleError(e);

@@ -121,6 +121,17 @@ describe("listingService", () => {
     await expect(createListing(input(venue.id, { phone: "+6581234567" }))).resolves.toBeTruthy();
   });
 
+  it("closes the check-then-act race: 20 concurrent posts for one phone allow only 10", async () => {
+    const venue = await makeVenue();
+    const results = await Promise.allSettled(
+      Array.from({ length: 20 }, () => createListing(input(venue.id, { phone: "+6599990000" }))),
+    );
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    expect(succeeded).toBe(10);
+    const active = await prisma.listing.count({ where: { phone: "+6599990000", status: "AVAILABLE" } });
+    expect(active).toBe(10);
+  });
+
   it("sweep expires past listings and scrubs old phones", async () => {
     const venue = await makeVenue();
     const { id: oldId } = await createListing(input(venue.id));
