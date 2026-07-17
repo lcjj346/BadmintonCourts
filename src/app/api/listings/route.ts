@@ -1,4 +1,4 @@
-import { ok, fail, handleError } from "@/lib/api";
+import { ok, fail, handleError, searchParamsToFilters } from "@/lib/api";
 import { boardFilterSchema, createListingSchema } from "@/lib/schemas";
 import { getClientIp, hashIp } from "@/lib/ip";
 import { listListings, createListingBatch } from "@/services/listingService";
@@ -7,7 +7,7 @@ import { assertAndRecordCreate } from "@/services/rateLimitService";
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const parsed = boardFilterSchema.safeParse(Object.fromEntries(url.searchParams));
+    const parsed = boardFilterSchema.safeParse(searchParamsToFilters(url));
     if (!parsed.success) return fail("Invalid filters", 400);
     return ok(await listListings(parsed.data));
   } catch (e) {

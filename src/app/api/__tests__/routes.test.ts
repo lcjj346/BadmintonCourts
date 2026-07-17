@@ -76,6 +76,27 @@ describe("listings API", () => {
     expect(await prisma.listing.count()).toBe(0);
   });
 
+  // Regression test: Object.fromEntries(url.searchParams) silently keeps only the LAST
+  // value for a repeated key, so ?date=A&date=B was collapsing to just "B" and quietly
+  // narrowing results instead of matching either date — a real bug in this public route,
+  // even though the board page itself never hit it (it calls listListings directly).
+  it("GET board matches ANY of several repeated ?date= params", async () => {
+    const venue = await makeVenue();
+    const dayAfter = dayjs(todaySgt()).add(2, "day").format("YYYY-MM-DD");
+    const dayAfterThat = dayjs(todaySgt()).add(3, "day").format("YYYY-MM-DD");
+    for (const date of [tomorrow, dayAfter, dayAfterThat]) {
+      await createListingRoute(req("http://x/api/listings", "POST", {
+        items: [{ venueId: venue.id, date, startTime: "08:00", endTime: "10:00", priceCents: 1600 }],
+        phone: "+6591234567", website: "",
+      }));
+    }
+
+    const res = await listListingsRoute(new Request(`http://x/api/listings?date=${tomorrow}&date=${dayAfter}`));
+    const { data } = await res.json();
+    expect(data).toHaveLength(2);
+    expect(data.map((l: { date: string }) => l.date.slice(0, 10)).sort()).toEqual([tomorrow, dayAfter].sort());
+  });
+
   it("posts a batch of courts under one manage link", async () => {
     const venue = await makeVenue();
     const body = {

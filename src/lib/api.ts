@@ -11,6 +11,22 @@ export function fail(message: string, status: number): Response {
   return Response.json({ data: null, error: message }, { status });
 }
 
+/**
+ * `Object.fromEntries(url.searchParams)` silently keeps only the LAST value for a
+ * repeated key (?date=A&date=B -> {date: "B"}) — wrong for boardFilterSchema's
+ * multi-select date/region/skill params, which expect an array when a key repeats.
+ * This mirrors the shape Next.js's own `searchParams` page prop already produces
+ * (string | string[] per key), which boardFilterSchema is built to parse.
+ */
+export function searchParamsToFilters(url: URL): Record<string, string | string[]> {
+  const params: Record<string, string | string[]> = {};
+  for (const key of new Set(url.searchParams.keys())) {
+    const values = url.searchParams.getAll(key);
+    params[key] = values.length > 1 ? values : values[0];
+  }
+  return params;
+}
+
 export function handleError(e: unknown): Response {
   if (e instanceof ZodError) {
     return fail(e.issues[0]?.message ?? "Invalid input", 400);

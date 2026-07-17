@@ -1,8 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { todaySgt, strToDate } from "@/lib/time";
+import { strToDate } from "@/lib/time";
 import type { BoardFilters, CreateSessionItemInput } from "@/lib/schemas";
-import { sweepExpired } from "@/services/listingService";
+import { sweepExpired, buildBoardWhere } from "@/services/listingService";
 import { assertUnderActiveCap, newBatchToken, withContactLock, contactWhere, type Contact } from "@/services/batchService";
 import { SKILL_ORDER } from "@/lib/skill";
 
@@ -22,22 +22,8 @@ export async function listSessions(filters: BoardFilters): Promise<PublicSession
   await sweepExpired();
   const rows = await prisma.gameSession.findMany({
     where: {
-      date: filters.date.length > 0
-        ? { in: filters.date.map(strToDate) }
-        : { gte: strToDate(todaySgt()) },
+      ...buildBoardWhere(filters),
       status: filters.available ? "OPEN" : { in: ["OPEN", "FILLED"] },
-      ...(filters.venueId ? { venueId: filters.venueId } : {}),
-      ...(filters.region.length > 0
-        ? { OR: [{ venue: { region: { in: filters.region } } }, { customRegion: { in: filters.region } }] }
-        : {}),
-      ...(filters.timeFrom || filters.timeTo
-        ? {
-            startTime: {
-              ...(filters.timeFrom ? { gte: filters.timeFrom } : {}),
-              ...(filters.timeTo ? { lt: filters.timeTo } : {}),
-            },
-          }
-        : {}),
     },
     select: PUBLIC_SESSION_SELECT,
     // Postgres enums sort by declared order (OPEN, FILLED); asc puts OPEN first
