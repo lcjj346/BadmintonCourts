@@ -172,13 +172,17 @@ describe("createSessionSchema", () => {
   });
 
   it("rejects playersNeeded out of range", () => {
-    for (const playersNeeded of [0, 51]) {
-      expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded })])).success).toBe(false);
+    for (const playersNeeded of [0, 31]) {
+      expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded, maxPax: 30 })])).success).toBe(false);
     }
   });
 
-  it("accepts playersNeeded up to 50", () => {
-    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 50, maxPax: 50 })])).success).toBe(true);
+  it("accepts playersNeeded up to 30", () => {
+    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 30, maxPax: 30 })])).success).toBe(true);
+  });
+
+  it("rejects maxPax over 30", () => {
+    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 2, maxPax: 31 })])).success).toBe(false);
   });
 
   it("rejects maxPax below playersNeeded, accepts equal", () => {

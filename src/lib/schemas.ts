@@ -95,8 +95,8 @@ const createListingItemSchema = createListingItemBase
   .refine(validVenueRef, VENUE_REF_MSG);
 
 const createSessionItemBase = itemBase.merge(venueRef).extend({
-  playersNeeded: z.number().int().min(1).max(50),
-  maxPax: z.number().int().min(1).max(50),
+  playersNeeded: z.number().int().min(1).max(30),
+  maxPax: z.number().int().min(1).max(30),
   skillMin: z.enum(SKILL_LEVELS),
   skillMax: z.enum(SKILL_LEVELS),
   pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),
@@ -152,8 +152,8 @@ export const editListingSchema = itemBase
 export const editSessionSchema = itemBase
   .merge(contactRef)
   .extend({
-    playersNeeded: z.number().int().min(1).max(50),
-    maxPax: z.number().int().min(1).max(50),
+    playersNeeded: z.number().int().min(1).max(30),
+    maxPax: z.number().int().min(1).max(30),
     skillMin: z.enum(SKILL_LEVELS),
     skillMax: z.enum(SKILL_LEVELS),
     pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),

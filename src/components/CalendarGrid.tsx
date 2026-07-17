@@ -6,14 +6,22 @@ import { todaySgt } from "@/lib/time";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-/** Month-grid date picker. Dates are plain "YYYY-MM-DD" strings throughout — no timezone math. */
+/**
+ * Month-grid date picker. Dates are plain "YYYY-MM-DD" strings throughout — no timezone math.
+ *
+ * `rangeFrom`/`rangeTo` (both inclusive, `rangeFrom <= rangeTo`) light up a whole span of days —
+ * airline-style — instead of just the single `value` day, for a two-tap range pick. Omit both to
+ * get the plain single-day highlight (e.g. DateField's one-date-at-a-time use).
+ */
 export function CalendarGrid({
-  value, min, max, onSelect,
+  value, min, max, onSelect, rangeFrom, rangeTo,
 }: {
   value: string;
   min: string;
   max: string;
   onSelect: (date: string) => void;
+  rangeFrom?: string;
+  rangeTo?: string;
 }) {
   const [viewMonth, setViewMonth] = useState(() => dayjs(value || min).format("YYYY-MM"));
   const monthStart = dayjs(`${viewMonth}-01`);
@@ -66,7 +74,8 @@ export function CalendarGrid({
         {cells.map((d, i) => {
           if (!d) return <div key={i} />;
           const disabled = d < min || d > max;
-          const selected = d === value;
+          const isEndpoint = rangeFrom ? d === rangeFrom || d === rangeTo : d === value;
+          const inRange = Boolean(rangeFrom && rangeTo && d > rangeFrom && d < rangeTo);
           const isToday = d === today;
           return (
             <button
@@ -77,11 +86,13 @@ export function CalendarGrid({
               aria-label={dayjs(d).format("D MMMM YYYY")}
               aria-current={isToday ? "date" : undefined}
               className={`aspect-square rounded-full text-sm transition-colors ${
-                selected
+                isEndpoint
                   ? "bg-court font-semibold text-white"
-                  : disabled
-                    ? "cursor-not-allowed text-gray-300"
-                    : `text-gray-700 hover:bg-court-light ${isToday ? "font-bold text-court ring-1 ring-inset ring-court" : ""}`
+                  : inRange
+                    ? "bg-court-light font-semibold text-court"
+                    : disabled
+                      ? "cursor-not-allowed text-gray-300"
+                      : `text-gray-700 hover:bg-court-light ${isToday ? "font-bold text-court ring-1 ring-inset ring-court" : ""}`
               }`}
             >
               {dayjs(d).date()}

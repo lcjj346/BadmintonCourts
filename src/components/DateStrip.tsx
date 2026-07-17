@@ -7,16 +7,26 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { CalendarGrid } from "@/components/CalendarGrid";
 import { todaySgt, maxPostDateSgt, formatDateLabel } from "@/lib/time";
 
+function daysBetween(from: string, to: string): string[] {
+  const range: string[] = [];
+  for (let cur = dayjs(from); cur.isBefore(dayjs(to)) || cur.isSame(dayjs(to)); cur = cur.add(1, "day")) {
+    range.push(cur.format("YYYY-MM-DD"));
+  }
+  return range;
+}
+
 export function DateStrip() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const selected = params.getAll("date");
   const [pickerOpen, setPickerOpen] = useState(false);
-  // First calendar tap starts a range; the second tap (any date, before or after)
-  // closes it — the whole inclusive span replaces the current selection. Tapping
-  // the same date twice selects just that one day.
+  // Airline-calendar-style two-tap range: first tap sets rangeStart (lights up
+  // immediately so it's obvious it registered), second tap sets rangeEnd and lights
+  // up the whole span between them. Nothing is applied to the board until the user
+  // taps "Use…" — picking is otherwise easy to mistake for silently doing nothing.
   const [rangeStart, setRangeStart] = useState<string | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<string | null>(null);
 
   const days = Array.from({ length: 14 }, (_, i) =>
     dayjs(todaySgt()).add(i, "day").format("YYYY-MM-DD"),
@@ -35,22 +45,30 @@ export function DateStrip() {
 
   function openPicker() {
     setRangeStart(null);
+    setRangeEnd(null);
     setPickerOpen(true);
   }
 
   function pickInCalendar(d: string) {
-    if (!rangeStart) {
+    // A tap after a range is already complete starts a fresh pick, same as re-opening.
+    if (!rangeStart || rangeEnd) {
       setRangeStart(d);
+      setRangeEnd(null);
       return;
     }
-    const [from, to] = d < rangeStart ? [d, rangeStart] : [rangeStart, d];
-    const range: string[] = [];
-    for (let cur = dayjs(from); cur.isBefore(dayjs(to)) || cur.isSame(dayjs(to)); cur = cur.add(1, "day")) {
-      range.push(cur.format("YYYY-MM-DD"));
-    }
-    setDates(range);
+    setRangeEnd(d);
+  }
+
+  const from = rangeStart && rangeEnd && rangeEnd < rangeStart ? rangeEnd : rangeStart;
+  const to = rangeStart && rangeEnd && rangeEnd < rangeStart ? rangeStart : rangeEnd;
+  const pendingRange = from && to ? daysBetween(from, to) : null;
+
+  function applyPick() {
+    if (!rangeStart) return;
+    setDates(pendingRange ?? [rangeStart]);
     setPickerOpen(false);
     setRangeStart(null);
+    setRangeEnd(null);
   }
 
   const pillClass = (active: boolean) =>
@@ -95,22 +113,38 @@ export function DateStrip() {
       <BottomSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        title={rangeStart ? `From ${formatDateLabel(rangeStart)} — tap the end date` : "Pick a date, or tap twice for a range"}
+        title={rangeEnd ? "Date range" : rangeStart ? "Tap an end date, or use just this day" : "Pick a date, or two for a range"}
       >
         <CalendarGrid
           value={rangeStart ?? selected[0] ?? todaySgt()}
+          rangeFrom={from ?? undefined}
+          rangeTo={to ?? undefined}
           min={todaySgt()}
           max={maxPostDateSgt()}
           onSelect={pickInCalendar}
         />
         {rangeStart && (
-          <button
-            type="button"
-            className="mt-3 text-xs text-gray-400 underline"
-            onClick={() => setRangeStart(null)}
-          >
-            Cancel, start over
-          </button>
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              onClick={applyPick}
+              className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white transition-colors hover:bg-court/90"
+            >
+              {pendingRange && pendingRange.length > 1
+                ? `Use these ${pendingRange.length} days`
+                : `Use ${formatDateLabel(rangeStart)}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRangeStart(null);
+                setRangeEnd(null);
+              }}
+              className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          </div>
         )}
       </BottomSheet>
     </div>

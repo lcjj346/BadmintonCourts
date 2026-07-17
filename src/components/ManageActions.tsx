@@ -82,6 +82,22 @@ export function ManageActions({
     if (await act({ action: "reopen" })) router.refresh();
   }
 
+  // Quick +/- stepper beside "Mark as filled" — updates just playersNeeded via the
+  // existing updatePlayers action, without opening the full edit form for a change
+  // the poster is likely to make several times as spots fill up.
+  const paxCap = post.maxPax ?? 30;
+  async function adjustPlayersNeeded(delta: number) {
+    const next = Math.min(paxCap, Math.max(1, playersNeeded + delta));
+    if (next === playersNeeded) return;
+    const prev = playersNeeded;
+    setPlayersNeeded(next);
+    if (!(await act({ action: "updatePlayers", playersNeeded: next }))) {
+      setPlayersNeeded(prev);
+      return;
+    }
+    router.refresh();
+  }
+
   async function remove() {
     setConfirmDelete(false);
     if (!(await act({}, "DELETE"))) return;
@@ -310,6 +326,32 @@ export function ManageActions({
 
   return (
     <div className="mt-3 space-y-2">
+      {!closed && type === "session" && (
+        <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2">
+          <span className="text-sm font-medium text-gray-600">Players needed</span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => adjustPlayersNeeded(-1)}
+              disabled={busy || playersNeeded <= 1}
+              aria-label="Decrease players needed"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-court text-lg font-bold text-court transition-colors hover:bg-court-light/60 disabled:opacity-30"
+            >
+              −
+            </button>
+            <span className="w-5 text-center text-sm font-bold tabular-nums">{playersNeeded}</span>
+            <button
+              type="button"
+              onClick={() => adjustPlayersNeeded(1)}
+              disabled={busy || playersNeeded >= paxCap}
+              aria-label="Increase players needed"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-court text-lg font-bold text-court transition-colors hover:bg-court-light/60 disabled:opacity-30"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
       {!closed && (
         <div className="flex gap-2">
           <button
