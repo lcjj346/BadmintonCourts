@@ -70,6 +70,7 @@ export async function seedLoadTest(
       notes: `${LOAD_TEST_TAG}${note ? " " + note : ""}`,
       // ~5 per phone, under the active-post cap; enough distinct numbers for any count.
       phone: `+6590${String(1000 + Math.floor(i / 5)).padStart(6, "0")}`,
+      telegramHandle: `tgcourt${i}`,
       batchToken: randomUUID(),
       status: "AVAILABLE" as const,
     };
@@ -85,11 +86,13 @@ export async function seedLoadTest(
       startTime: `${String(hour).padStart(2, "0")}:00`,
       endTime: `${String(hour + 1 + (i % 3)).padStart(2, "0")}:00`,
       playersNeeded: 1 + (i % 6),
+      maxPax: 100,
       skillMin,
       skillMax: skillMin,
       pricePerPlayerCents: i % 9 === 0 ? null : i % 11 === 0 ? 0 : 200 + (i % 8) * 150,
       notes: `${LOAD_TEST_TAG}${note ? " " + note : ""}`,
       phone: `+6591${String(2000 + Math.floor(i / 5)).padStart(6, "0")}`,
+      telegramHandle: `tggame${i}`,
       batchToken: randomUUID(),
       status: "OPEN" as const,
     };

@@ -181,14 +181,18 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
   await page.getByRole("button", { name: /save changes/i }).click();
   await expect(page.getByText(/needs 1/i).first()).toBeVisible();
 
-  // Players board shows the open game with the updated count ("Needs 1").
+  // Quick +/- stepper beside "Mark as filled" bumps it without reopening the edit form.
+  await page.getByRole("button", { name: /increase players needed/i }).click();
+  await expect(page.getByText(/needs 2/i).first()).toBeVisible();
+
+  // Players board shows the open game with the updated count ("Needs 2").
   await page.goto("/?tab=players");
-  await expect(page.getByText(/needs 1/i).first()).toBeVisible();
+  await expect(page.getByText(/needs 2/i).first()).toBeVisible();
 
   // Skill filter → Advanced, game still shown.
   await page.getByRole("button", { name: /skill/i }).click();
   await page.getByRole("button", { name: /^Advanced$/ }).click();
-  await expect(page.getByText(/needs 1/i).first()).toBeVisible();
+  await expect(page.getByText(/needs 2/i).first()).toBeVisible();
 
   // Clean up so repeated runs don't hit the per-phone active-post cap.
   await page.goto(manageUrl);
