@@ -145,8 +145,12 @@ export async function addListingsToBatch(
   return { ids };
 }
 
+// Only an AVAILABLE listing reveals its contact — the UI already hides the "Reveal"
+// button once a post is SOLD/EXPIRED, but that's a client-side gate only; without this
+// check, anyone who already has the id (e.g. captured before it sold) could still hit
+// the API directly and get the number.
 export async function revealListingContact(id: string): Promise<Contact | null> {
-  const row = await prisma.listing.findUnique({ where: { id }, select: { phone: true, telegramHandle: true } });
-  if (!row) return null;
+  const row = await prisma.listing.findUnique({ where: { id }, select: { phone: true, telegramHandle: true, status: true } });
+  if (!row || row.status !== "AVAILABLE") return null;
   return { phone: row.phone ?? undefined, telegramHandle: row.telegramHandle ?? undefined };
 }
