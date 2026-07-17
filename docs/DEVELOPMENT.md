@@ -282,6 +282,18 @@ npm run prod:seed      # npx prisma db seed against .env.production.local
 Both `.env` and `.env.production.local` are gitignored — only the `.example` templates are
 committed.
 
+**A real trap here:** `next start` (production mode — what `npm run start` and CI's e2e job
+run) resolves `.env.production.local` *ahead of* `.env` if that file exists, regardless of
+`NODE_ENV`. On a machine set up for `prod:migrate`/`prod:seed`, a bare `npm run start` would
+silently serve — and let you post/reveal/delete against — the real production database. Fixed
+structurally: `npm run start` is `dotenv -e .env -- next start`, which injects `.env`'s values
+*before* Next boots, and Next's own env loader never overrides an already-set value. The same
+issue existed in `e2e/global-setup.ts`, `e2e/core-loop.spec.ts`, and `e2e-load/load.spec.ts`
+(all called `loadEnvConfig(process.cwd())` without forcing dev-mode precedence) — all three now
+pass `true` explicitly. None of this affects actual Vercel deployments, which never invoke
+`npm run start` — Vercel serves the `next build` output through its own runtime and injects env
+vars from its dashboard directly, bypassing `.env*` files entirely.
+
 ### Environment variables
 
 | Var | Purpose |
