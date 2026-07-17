@@ -28,7 +28,13 @@ const THRESHOLDS = {
 let prisma: PrismaClient;
 
 test.beforeAll(async () => {
-  loadEnvConfig(process.cwd());
+  // dev=true forces .env.local/.env precedence over .env.production.local (see
+  // the identical comment in e2e/global-setup.ts) so a plain `npm run test:load`
+  // can never silently seed/wipe 300+300 rows in production. Running against
+  // production on purpose (`npm run test:load:prod`) works anyway: dotenv-cli
+  // injects DATABASE_URL into this process's env *before* it starts, and
+  // loadEnvConfig never overrides an already-set process.env value.
+  loadEnvConfig(process.cwd(), true);
   prisma = new PrismaClient();
   await cleanupLoadTest(prisma);
   await prisma.rateLimitEvent.deleteMany({ where: { action: "CREATE" } });

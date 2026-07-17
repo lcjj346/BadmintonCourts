@@ -17,7 +17,13 @@ const TEST_PHONES = ["+6591234567", "+6581234567"];
  *    active-post cap and the board stay clean across reruns.
  */
 export default async function globalSetup() {
-  loadEnvConfig(process.cwd());
+  // The `dev` param genuinely changes which .env file wins — omitting it (or
+  // passing false) makes @next/env prefer .env.production.local (if present)
+  // over .env, regardless of NODE_ENV. That's the real production database on
+  // any machine also used for prod:migrate/prod:seed. `true` forces the same
+  // .env.local/.env precedence `next dev` uses, so this can never silently
+  // wipe rate-limit events or posts in production.
+  loadEnvConfig(process.cwd(), true);
   const prisma = new PrismaClient();
   // Telegram-only posts (no phone) use handles prefixed like this in the specs —
   // match them too, since the phone filter above misses them entirely.

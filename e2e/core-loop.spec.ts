@@ -3,7 +3,11 @@ import dayjs from "dayjs";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 
-loadEnvConfig(process.cwd());
+// dev=true forces .env.local/.env precedence over .env.production.local (see
+// the identical comment in e2e/global-setup.ts) — without it, this spec's own
+// per-test DB wipe could silently target production on a machine that also
+// has prod:migrate/prod:seed credentials configured.
+loadEnvConfig(process.cwd(), true);
 const prisma = new PrismaClient();
 
 const PHONE = "91234567";
