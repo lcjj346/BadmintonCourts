@@ -443,7 +443,7 @@ export function PostForm({
               maxLength={300}
               rows={2}
               value={entry.notes}
-              placeholder={kind === "court" ? "e.g. court 1, doubles, RSL shuttles provided" : "e.g. doubles, bring own shuttles"}
+              placeholder={kind === "court" ? "e.g. court 1, enter from backgate" : "e.g. court 1, RSL shuttles provided"}
               onChange={(e) => updateEntry(entry.key, { notes: e.target.value })}
             />
           </div>
