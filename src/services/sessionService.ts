@@ -8,7 +8,7 @@ import { SKILL_ORDER } from "@/lib/skill";
 
 const PUBLIC_SESSION_SELECT = {
   id: true, date: true, startTime: true, endTime: true,
-  playersNeeded: true, skillMin: true, skillMax: true, pricePerPlayerCents: true,
+  playersNeeded: true, maxPax: true, skillMin: true, skillMax: true, pricePerPlayerCents: true,
   notes: true, status: true, createdAt: true,
   customVenueName: true, customRegion: true,
   venue: {
@@ -22,11 +22,13 @@ export async function listSessions(filters: BoardFilters): Promise<PublicSession
   await sweepExpired();
   const rows = await prisma.gameSession.findMany({
     where: {
-      date: filters.date ? strToDate(filters.date) : { gte: strToDate(todaySgt()) },
+      date: filters.date.length > 0
+        ? { in: filters.date.map(strToDate) }
+        : { gte: strToDate(todaySgt()) },
       status: filters.available ? "OPEN" : { in: ["OPEN", "FILLED"] },
       ...(filters.venueId ? { venueId: filters.venueId } : {}),
-      ...(filters.region
-        ? { OR: [{ venue: { region: filters.region } }, { customRegion: filters.region }] }
+      ...(filters.region.length > 0
+        ? { OR: [{ venue: { region: { in: filters.region } } }, { customRegion: { in: filters.region } }] }
         : {}),
       ...(filters.timeFrom || filters.timeTo
         ? {
@@ -42,13 +44,16 @@ export async function listSessions(filters: BoardFilters): Promise<PublicSession
     orderBy: [{ date: "asc" }, { status: "asc" }, { startTime: "asc" }],
   });
 
-  // A poster's skill is a RANGE, so "filter by skill X" means "X falls within [skillMin, skillMax]".
-  // That overlap check isn't a plain column comparison, so it's applied here rather than in Prisma's `where`.
-  if (!filters.skill) return rows;
-  const target = SKILL_ORDER.indexOf(filters.skill);
-  return rows.filter(
-    (r) => SKILL_ORDER.indexOf(r.skillMin) <= target && target <= SKILL_ORDER.indexOf(r.skillMax),
-  );
+  // A poster's skill is a RANGE, so "filter by skill X" means "X falls within [skillMin, skillMax]" —
+  // with multiple selected skills, a row matches if ANY of them falls in its range. That overlap
+  // check isn't a plain column comparison, so it's applied here rather than in Prisma's `where`.
+  if (filters.skill.length === 0) return rows;
+  const targets = filters.skill.map((s) => SKILL_ORDER.indexOf(s));
+  return rows.filter((r) => {
+    const lo = SKILL_ORDER.indexOf(r.skillMin);
+    const hi = SKILL_ORDER.indexOf(r.skillMax);
+    return targets.some((t) => lo <= t && t <= hi);
+  });
 }
 
 export async function getSession(id: string): Promise<PublicSession | null> {
@@ -65,6 +70,7 @@ function sessionCreator(item: CreateSessionItemInput, contact: Contact, batchTok
       startTime: item.startTime,
       endTime: item.endTime,
       playersNeeded: item.playersNeeded,
+      maxPax: item.maxPax,
       skillMin: item.skillMin,
       skillMax: item.skillMax,
       pricePerPlayerCents: item.pricePerPlayerCents,

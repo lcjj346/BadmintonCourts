@@ -30,13 +30,33 @@ describe("DateStrip", () => {
     expect(all?.className).toContain("bg-court");
   });
 
-  it("opens a calendar sheet on Pick, and picking a day navigates to it", async () => {
+  it("tapping a day chip toggles it into the date filter", async () => {
+    render(<DateStrip />);
+    await userEvent.click(screen.getByText("Today"));
+    expect(replace).toHaveBeenCalledWith(expect.stringContaining(`date=${todaySgt()}`));
+  });
+
+  it("opens a calendar sheet on Pick; a single tap starts a range instead of navigating", async () => {
     render(<DateStrip />);
     await userEvent.click(screen.getByText("Pick"));
-    expect(screen.getByRole("dialog", { name: "Jump to date" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Pick a date, or tap twice for a range" })).toBeInTheDocument();
 
     const today = todaySgt();
     const dayLabel = dayjs(today).format("D MMMM YYYY");
+    await userEvent.click(screen.getByRole("button", { name: dayLabel }));
+
+    // First tap only starts the range — no navigation yet, sheet title updates to prompt for an end date.
+    expect(replace).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "From Today — tap the end date" })).toBeInTheDocument();
+  });
+
+  it("tapping the same day twice in the calendar selects just that single day", async () => {
+    render(<DateStrip />);
+    await userEvent.click(screen.getByText("Pick"));
+
+    const today = todaySgt();
+    const dayLabel = dayjs(today).format("D MMMM YYYY");
+    await userEvent.click(screen.getByRole("button", { name: dayLabel }));
     await userEvent.click(screen.getByRole("button", { name: dayLabel }));
 
     expect(replace).toHaveBeenCalledWith(expect.stringContaining(`date=${today}`));

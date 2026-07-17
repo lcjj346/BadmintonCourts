@@ -21,11 +21,11 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
   const params = useSearchParams();
   const [sheet, setSheet] = useState<SheetKey>(null);
 
-  const region = params.get("region");
+  const regions = params.getAll("region");
   const venueId = params.get("venueId");
   const timeFrom = params.get("timeFrom");
   const timeTo = params.get("timeTo");
-  const skill = params.get("skill");
+  const skills = params.getAll("skill");
   const available = params.get("available");
   const venueName = venues.find((v) => v.id === venueId)?.name;
 
@@ -56,6 +56,17 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
     apply([[key, value]]);
   }
 
+  function setMulti(key: string, values: string[]) {
+    const next = new URLSearchParams(params);
+    next.delete(key);
+    for (const v of values) next.append(key, v);
+    router.replace(`${pathname}?${next.toString()}`);
+  }
+
+  function toggleMulti(key: string, values: string[], value: string) {
+    setMulti(key, values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  }
+
   const timeActive = Boolean(timeFrom || timeTo);
   const timeLabel = timeActive ? `${timeFrom ?? "…"}–${timeTo ?? "…"} ✕` : "Time ▾";
 
@@ -81,9 +92,19 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
 
   const applyDisabled = toSel <= fromSel;
 
+  const regionLabel = regions.length === 0 ? "Region ▾" : regions.length === 1 ? regions[0] : `Region (${regions.length})`;
+  const skillLabel =
+    skills.length === 0
+      ? "Skill ▾"
+      : skills.length === 1
+        ? SKILL_OPTIONS.find(([v]) => v === skills[0])?.[1] ?? "Skill ▾"
+        : `Skill (${skills.length})`;
+
   return (
     <div className="flex gap-2 overflow-x-auto pb-3 pt-2">
-      {chip("Region", region, "region", "region")}
+      <button onClick={() => setSheet("region")} className={chipClass(regions.length > 0)}>
+        {regionLabel}
+      </button>
       {chip("Venue", venueName ?? null, "venue", "venueId")}
 
       <button
@@ -100,12 +121,35 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
         {showSkill ? "Open only" : "Available only"}
       </button>
 
-      {showSkill && chip("Skill", skill ? SKILL_OPTIONS.find(([v]) => v === skill)?.[1] ?? null : null, "skill", "skill")}
+      {showSkill && (
+        <button onClick={() => setSheet("skill")} className={chipClass(skills.length > 0)}>
+          {skillLabel}
+        </button>
+      )}
 
       <BottomSheet open={sheet === "region"} onClose={() => setSheet(null)} title="Region">
+        <p className="mb-2 text-xs text-gray-400">Tap to select more than one.</p>
         {REGIONS.map((r) => (
-          <button key={r} className={pill(r === region)} onClick={() => setParam("region", r)}>{r}</button>
+          <button key={r} className={pill(regions.includes(r))} onClick={() => toggleMulti("region", regions, r)}>{r}</button>
         ))}
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={() => setSheet(null)}
+            className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white transition-colors hover:bg-court/90"
+          >
+            Done
+          </button>
+          {regions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setMulti("region", [])}
+              className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </BottomSheet>
 
       <BottomSheet open={sheet === "venue"} onClose={() => setSheet(null)} title="Venue">
@@ -158,9 +202,34 @@ export function FilterBar({ venues, showSkill }: { venues: VenueOption[]; showSk
 
       {showSkill && (
         <BottomSheet open={sheet === "skill"} onClose={() => setSheet(null)} title="Skill level">
+          <p className="mb-2 text-xs text-gray-400">Tap to select more than one.</p>
           {SKILL_OPTIONS.map(([value, text]) => (
-            <button key={value} className={pill(value === skill)} onClick={() => setParam("skill", value)}>{text}</button>
+            <button
+              key={value}
+              className={pill(skills.includes(value))}
+              onClick={() => toggleMulti("skill", skills, value)}
+            >
+              {text}
+            </button>
           ))}
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              onClick={() => setSheet(null)}
+              className="flex-1 rounded-xl bg-court py-2.5 font-semibold text-white transition-colors hover:bg-court/90"
+            >
+              Done
+            </button>
+            {skills.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setMulti("skill", [])}
+                className="rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </BottomSheet>
       )}
     </div>

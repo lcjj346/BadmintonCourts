@@ -37,7 +37,8 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
           <p className="mt-1 text-xs text-amber-700">{venue.availabilityNote}</p>
         )}
         <p className="mt-2 text-sm font-medium text-court">
-          Needs {session.playersNeeded} player{session.playersNeeded > 1 ? "s" : ""} ·{" "}
+          Needs {session.playersNeeded} player{session.playersNeeded > 1 ? "s" : ""}
+          {session.maxPax ? ` (max ${session.maxPax} pax)` : ""} ·{" "}
           {skillRangeLabel(session.skillMin, session.skillMax)}
         </p>
         <p className="mt-3 text-2xl font-bold text-court">

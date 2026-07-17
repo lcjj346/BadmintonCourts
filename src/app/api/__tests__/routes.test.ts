@@ -95,7 +95,7 @@ describe("listings API", () => {
     const createRes = await createSessionRoute(req("http://x/api/sessions", "POST", {
       items: [{
         venueId: venue.id, date: tomorrow, startTime: "18:00", endTime: "20:00",
-        playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: null,
+        playersNeeded: 2, maxPax: 6, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: null,
       }],
       phone: "+6591234567", website: "",
     }));
@@ -236,7 +236,7 @@ describe("sessions API", () => {
     const body = {
       items: [{
         venueId: venue.id, date: tomorrow, startTime: "18:00", endTime: "20:00",
-        playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
+        playersNeeded: 2, maxPax: 6, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
       }],
       phone: "+6591234567", website: "",
     };

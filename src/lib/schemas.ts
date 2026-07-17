@@ -57,6 +57,9 @@ const skillOrder = (v: { skillMin: (typeof SKILL_LEVELS)[number]; skillMax: (typ
   skillIndex(v.skillMax) >= skillIndex(v.skillMin);
 const SKILL_ORDER_MSG = { message: "Max skill must be the same as or higher than min skill", path: ["skillMax"] };
 
+const maxPaxFitsNeeded = (v: { playersNeeded: number; maxPax: number }) => v.maxPax >= v.playersNeeded;
+const MAX_PAX_MSG = { message: "Max pax must be at least the number of players needed", path: ["maxPax"] };
+
 // A court/game is at either a curated venue (venueId) or a venue not in our list
 // (customVenueName + customRegion) — never both, never neither.
 const venueRef = z.object({
@@ -93,6 +96,7 @@ const createListingItemSchema = createListingItemBase
 
 const createSessionItemBase = itemBase.merge(venueRef).extend({
   playersNeeded: z.number().int().min(1).max(50),
+  maxPax: z.number().int().min(1).max(50),
   skillMin: z.enum(SKILL_LEVELS),
   skillMax: z.enum(SKILL_LEVELS),
   pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),
@@ -101,7 +105,8 @@ const createSessionItemSchema = createSessionItemBase
   .refine(timeOrder, TIME_ORDER_MSG)
   .refine(futureStartToday, FUTURE_START_MSG)
   .refine(skillOrder, SKILL_ORDER_MSG)
-  .refine(validVenueRef, VENUE_REF_MSG);
+  .refine(validVenueRef, VENUE_REF_MSG)
+  .refine(maxPaxFitsNeeded, MAX_PAX_MSG);
 
 // Phone and Telegram are both optional individually, but at least one is required —
 // enforced by the refine below, applied after items/other fields are attached so the
@@ -148,6 +153,7 @@ export const editSessionSchema = itemBase
   .merge(contactRef)
   .extend({
     playersNeeded: z.number().int().min(1).max(50),
+    maxPax: z.number().int().min(1).max(50),
     skillMin: z.enum(SKILL_LEVELS),
     skillMax: z.enum(SKILL_LEVELS),
     pricePerPlayerCents: z.number().int().min(0).max(50_000).nullable(),
@@ -155,17 +161,32 @@ export const editSessionSchema = itemBase
   .refine(timeOrder, TIME_ORDER_MSG)
   .refine(futureStartToday, FUTURE_START_MSG)
   .refine(skillOrder, SKILL_ORDER_MSG)
-  .refine(hasContact, CONTACT_MSG);
+  .refine(hasContact, CONTACT_MSG)
+  .refine(maxPaxFitsNeeded, MAX_PAX_MSG);
 
-// Each field falls back to undefined (no filter) on an invalid value, so a stale or
-// hand-edited URL degrades gracefully instead of blanking the whole board.
+// date/region/skill are multi-select — the URL carries each as a repeated query
+// param (?date=2026-07-20&date=2026-07-21&region=CENTRAL&region=WEST). Next.js
+// already hands back a string[] for a repeated key (and a bare string for a
+// single one), so this normalizes either shape to string[] before validating.
+const toArray = (v: unknown): unknown[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
+
+/** Invalid entries are dropped individually (not the whole field) so a stale or
+ * hand-edited URL degrades gracefully instead of blanking the whole board. */
+function multiSelect<T extends string>(values: readonly T[]) {
+  return z.preprocess(toArray, z.array(z.string())).transform(
+    (arr) => [...new Set(arr.filter((v): v is T => (values as readonly string[]).includes(v)))],
+  );
+}
+
 export const boardFilterSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().catch(undefined),
-  region: z.enum(REGIONS).optional().catch(undefined),
+  date: z.preprocess(toArray, z.array(z.string())).transform(
+    (arr) => [...new Set(arr.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort(),
+  ),
+  region: multiSelect(REGIONS),
   venueId: z.string().uuid().optional().catch(undefined),
   timeFrom: timeStr.optional().catch(undefined),
   timeTo: timeStr.optional().catch(undefined),
-  skill: z.enum(SKILL_LEVELS).optional().catch(undefined),
+  skill: multiSelect(SKILL_LEVELS),
   available: z.enum(["1"]).optional().catch(undefined),
 });
 

@@ -25,7 +25,9 @@ export function SessionCard({ session }: { session: PublicSession }) {
       }
       extra={
         <div className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-court-light/70 px-2 py-0.5 text-[11px] font-semibold text-court">
-          <span className="tabular-nums">Needs {session.playersNeeded}</span>
+          <span className="tabular-nums">
+            Needs {session.playersNeeded}{session.maxPax ? ` (max ${session.maxPax})` : ""}
+          </span>
           <span className="text-court/40">·</span>
           <span>{skillRangeLabel(session.skillMin, session.skillMax)}</span>
         </div>

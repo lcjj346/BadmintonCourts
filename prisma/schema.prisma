@@ -101,6 +101,7 @@ model GameSession {
   startTime           String
   endTime             String
   playersNeeded       Int
+  maxPax              Int?                             // total court capacity (rotating group size) — null for posts made before this field existed
   skillMin            SkillLevel
   skillMax            SkillLevel
   pricePerPlayerCents Int?                // 0 = free, null = split/negotiable

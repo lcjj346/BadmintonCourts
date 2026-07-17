@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/db";
 import { resetDb, makeVenue } from "@/lib/__tests__/helpers/db";
 import { todaySgt, strToDate } from "@/lib/time";
+import type { BoardFilters } from "@/lib/schemas";
 import {
   createListingBatch, listListings, getListing, revealListingContact,
   sweepExpired, ActivePostCapError,
@@ -13,6 +14,10 @@ afterAll(() => prisma.$disconnect());
 
 // Default fixture dated TOMORROW so a same-day expiry sweep can never race the test clock.
 const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
+
+// date/region/skill are multi-select arrays in BoardFilters; this fills the empty
+// defaults so test bodies only need to specify what they're actually testing.
+const bf = (over: Partial<BoardFilters> = {}): BoardFilters => ({ date: [], region: [], skill: [], ...over });
 
 const input = (venueId: string, over: Record<string, unknown> = {}) => ({
   venueId, date: tomorrow, startTime: "08:00", endTime: "10:00",
@@ -36,7 +41,7 @@ describe("listingService", () => {
     const { id, batchToken } = await createListing(input(venue.id));
     expect(batchToken).toMatch(/^[0-9a-f-]{36}$/);
 
-    const rows = await listListings({});
+    const rows = await listListings(bf());
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(id);
     expect(rows[0]).not.toHaveProperty("phone");
@@ -62,7 +67,7 @@ describe("listingService", () => {
     expect(row.customVenueName).toBe("Some Private Hall");
     expect(row.customRegion).toBe("EAST");
 
-    const rows = await listListings({ region: "EAST" });
+    const rows = await listListings(bf({ region: ["EAST"] }));
     expect(rows).toHaveLength(1);
     expect(rows[0].venue).toBeNull();
   });
@@ -75,10 +80,38 @@ describe("listingService", () => {
     await createListing(input(west.id, { startTime: "08:00", endTime: "10:00" }));
     await createListing(input(east.id, { startTime: "18:00", endTime: "20:00" }));
 
-    expect(await listListings({ region: "EAST" })).toHaveLength(1);
-    expect(await listListings({ venueId: west.id })).toHaveLength(1);
-    expect(await listListings({ timeFrom: "18:00" })).toHaveLength(1);
-    expect(await listListings({ timeFrom: "08:00", timeTo: "10:00" })).toHaveLength(1);
+    expect(await listListings(bf({ region: ["EAST"] }))).toHaveLength(1);
+    expect(await listListings(bf({ venueId: west.id }))).toHaveLength(1);
+    expect(await listListings(bf({ timeFrom: "18:00" }))).toHaveLength(1);
+    expect(await listListings(bf({ timeFrom: "08:00", timeTo: "10:00" }))).toHaveLength(1);
+  });
+
+  it("multi-select region matches ANY of the selected regions", async () => {
+    const west = await makeVenue("West Hall");
+    const east = await prisma.venue.create({
+      data: { name: "East Hall", address: "2 E St", postalCode: "469000", region: "EAST", venueType: "SPORTS_HALL" },
+    });
+    const north = await prisma.venue.create({
+      data: { name: "North Hall", address: "3 N St", postalCode: "769000", region: "NORTH", venueType: "SPORTS_HALL" },
+    });
+    await createListing(input(west.id));
+    await createListing(input(east.id, { phone: "+6581234567" }));
+    await createListing(input(north.id, { phone: "+6571234567" }));
+
+    const rows = await listListings(bf({ region: ["EAST", "WEST"] }));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.venue?.region === "EAST" || r.venue?.region === "WEST")).toBe(true);
+  });
+
+  it("multi-select date matches any of the selected dates", async () => {
+    const venue = await makeVenue();
+    const dayAfter = dayjs(todaySgt()).add(2, "day").format("YYYY-MM-DD");
+    await createListing(input(venue.id));
+    await createListing(input(venue.id, { date: dayAfter, phone: "+6581234567" }));
+    await createListing(input(venue.id, { date: dayjs(todaySgt()).add(3, "day").format("YYYY-MM-DD"), phone: "+6571234567" }));
+
+    const rows = await listListings(bf({ date: [tomorrow, dayAfter] }));
+    expect(rows).toHaveLength(2);
   });
 
   it("enforces max 10 active listings per phone", async () => {
@@ -142,7 +175,7 @@ describe("listingService", () => {
     await createListing(input(venue.id, { phone: "+6581234567" }));
     await prisma.listing.update({ where: { id: soldId }, data: { status: "SOLD" } });
 
-    const rows = await listListings({ date: tomorrow });
+    const rows = await listListings(bf({ date: [tomorrow] }));
     expect(rows).toHaveLength(2);
     expect(rows[0].status).toBe("AVAILABLE");
     expect(rows[1].status).toBe("SOLD");
@@ -161,7 +194,7 @@ describe("listingService", () => {
     await createListing(input(venue.id, { startTime: "20:00" }));
     await createListing(input(venue.id, { startTime: "07:00" }));
 
-    const rows = await listListings({});
+    const rows = await listListings(bf());
     expect(rows).toHaveLength(3);
     expect(rows[0].startTime).toBe("07:00");
     expect(rows[1].startTime).toBe("20:00");
@@ -194,7 +227,7 @@ describe("listingService", () => {
     await createListing(input(venue.id, { phone: "+6581234567" }));
     await prisma.listing.update({ where: { id: soldId }, data: { status: "SOLD" } });
 
-    const rows = await listListings({ available: "1" });
+    const rows = await listListings(bf({ available: "1" }));
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe("AVAILABLE");
   });

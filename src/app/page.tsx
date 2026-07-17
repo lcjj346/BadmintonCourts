@@ -20,7 +20,7 @@ export default async function BoardPage({
   const raw = await searchParams;
   const tab = raw.tab === "players" ? "players" : "courts";
   const parsed = boardFilterSchema.safeParse(raw);
-  const filters = parsed.success ? parsed.data : {};
+  const filters = parsed.success ? parsed.data : { date: [], region: [], skill: [] };
 
   const venues = await listVenues();
   const rows = tab === "courts"
@@ -32,7 +32,7 @@ export default async function BoardPage({
       active ? "border-court text-court" : "border-transparent text-gray-400"
     }`;
 
-  const dateQ = filters.date ? `&date=${filters.date}` : "";
+  const dateQ = filters.date.map((d) => `&date=${d}`).join("");
 
   type Row = { id: string; date: Date };
   const list: Row[] = rows;
@@ -42,9 +42,10 @@ export default async function BoardPage({
       ? <ListingCard key={row.id} listing={row as Awaited<ReturnType<typeof listListings>>[number]} />
       : <SessionCard key={row.id} session={row as Awaited<ReturnType<typeof listSessions>>[number]} />;
 
-  // When no single date is selected, group rows under date headers. Rows come back
-  // ordered by date already, so a simple run-length grouping keeps order.
-  const grouped = !filters.date;
+  // When zero or 2+ dates are selected, group rows under date headers — with exactly
+  // one date picked, every row already shares it, so a header would be redundant.
+  // Rows come back ordered by date already, so a simple run-length grouping keeps order.
+  const grouped = filters.date.length !== 1;
   const groups: { key: string; label: string; rows: Row[] }[] = [];
   if (grouped) {
     for (const row of list) {

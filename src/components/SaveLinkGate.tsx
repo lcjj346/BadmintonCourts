@@ -90,7 +90,7 @@ export function SaveLinkGate({
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
-              className="pointer-drift pointer-events-none size-5 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
+              className="pointer-drift pointer-events-none mt-2 size-5 shrink-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
             >
               <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" fill="white" stroke="#14532d" strokeWidth="1" strokeLinejoin="round" />
             </svg>

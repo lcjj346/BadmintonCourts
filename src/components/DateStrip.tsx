@@ -11,18 +11,46 @@ export function DateStrip() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const selected = params.get("date");
+  const selected = params.getAll("date");
   const [pickerOpen, setPickerOpen] = useState(false);
+  // First calendar tap starts a range; the second tap (any date, before or after)
+  // closes it — the whole inclusive span replaces the current selection. Tapping
+  // the same date twice selects just that one day.
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
 
   const days = Array.from({ length: 14 }, (_, i) =>
     dayjs(todaySgt()).add(i, "day").format("YYYY-MM-DD"),
   );
 
-  function go(date: string | null) {
+  function setDates(dates: string[]) {
     const next = new URLSearchParams(params);
-    if (date === null) next.delete("date");
-    else next.set("date", date);
+    next.delete("date");
+    for (const d of dates) next.append("date", d);
     router.replace(`${pathname}?${next.toString()}`);
+  }
+
+  function toggle(date: string) {
+    setDates(selected.includes(date) ? selected.filter((d) => d !== date) : [...selected, date]);
+  }
+
+  function openPicker() {
+    setRangeStart(null);
+    setPickerOpen(true);
+  }
+
+  function pickInCalendar(d: string) {
+    if (!rangeStart) {
+      setRangeStart(d);
+      return;
+    }
+    const [from, to] = d < rangeStart ? [d, rangeStart] : [rangeStart, d];
+    const range: string[] = [];
+    for (let cur = dayjs(from); cur.isBefore(dayjs(to)) || cur.isSame(dayjs(to)); cur = cur.add(1, "day")) {
+      range.push(cur.format("YYYY-MM-DD"));
+    }
+    setDates(range);
+    setPickerOpen(false);
+    setRangeStart(null);
   }
 
   const pillClass = (active: boolean) =>
@@ -36,7 +64,7 @@ export function DateStrip() {
     <div className="flex items-center gap-2 overflow-x-auto pb-3 pt-3">
       <button
         type="button"
-        onClick={() => setPickerOpen(true)}
+        onClick={openPicker}
         className="relative flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-court bg-court-light px-3 py-1 text-sm font-medium text-court shadow-sm transition-colors hover:bg-court hover:text-white active:bg-court active:text-white"
       >
         <svg
@@ -56,24 +84,34 @@ export function DateStrip() {
         </svg>
         Pick
       </button>
-      <button onClick={() => go(null)} className={pillClass(!selected)}>
+      <button onClick={() => setDates([])} className={pillClass(selected.length === 0)}>
         All
       </button>
       {days.map((d) => (
-        <button key={d} onClick={() => go(d)} className={pillClass(d === selected)}>
+        <button key={d} onClick={() => toggle(d)} className={pillClass(selected.includes(d))}>
           {formatDateLabel(d)}
         </button>
       ))}
-      <BottomSheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Jump to date">
+      <BottomSheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title={rangeStart ? `From ${formatDateLabel(rangeStart)} — tap the end date` : "Pick a date, or tap twice for a range"}
+      >
         <CalendarGrid
-          value={selected ?? todaySgt()}
+          value={rangeStart ?? selected[0] ?? todaySgt()}
           min={todaySgt()}
           max={maxPostDateSgt()}
-          onSelect={(d) => {
-            go(d);
-            setPickerOpen(false);
-          }}
+          onSelect={pickInCalendar}
         />
+        {rangeStart && (
+          <button
+            type="button"
+            className="mt-3 text-xs text-gray-400 underline"
+            onClick={() => setRangeStart(null)}
+          >
+            Cancel, start over
+          </button>
+        )}
       </BottomSheet>
     </div>
   );
