@@ -78,35 +78,41 @@ export default async function BoardPage({
         <FilterBar venues={venues} showSkill={tab === "players"} />
       </div>
 
-      {rows.length === 0 && (
-        <div className="flex flex-col items-center gap-3 py-14 text-center">
-          <svg aria-hidden="true" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-          </svg>
-          <p className="text-sm font-medium text-gray-500">No {tab === "courts" ? "courts" : "players"} match your filters</p>
-          <p className="text-xs text-gray-400">Try another date, clear a filter, or be the first to post.</p>
-        </div>
-      )}
+      {/* min-h keeps a short/empty board tall enough that the footer's disclaimer text
+          (in the root layout, after this page's content) doesn't end up rendering right
+          behind the fixed "+" button below — that button is pinned to the viewport
+          regardless of how little content there is. */}
+      <div className="min-h-[60vh]">
+        {rows.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-14 text-center">
+            <svg aria-hidden="true" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+            <p className="text-sm font-medium text-gray-500">No {tab === "courts" ? "courts" : "players"} match your filters</p>
+            <p className="text-xs text-gray-400">Try another date, clear a filter, or be the first to post.</p>
+          </div>
+        )}
 
-      {grouped ? (
-        <div className="mt-2 space-y-4">
-          {groups.map((g) => (
-            <section key={g.key}>
-              <h2 className="py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                {g.label}
-              </h2>
-              <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
-                {g.rows.map(renderCard)}
-              </div>
-            </section>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-2 space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
-          {list.map(renderCard)}
-        </div>
-      )}
+        {grouped ? (
+          <div className="mt-2 space-y-4">
+            {groups.map((g) => (
+              <section key={g.key}>
+                <h2 className="py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  {g.label}
+                </h2>
+                <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
+                  {g.rows.map(renderCard)}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
+            {list.map(renderCard)}
+          </div>
+        )}
+      </div>
 
       <Link
         href="/post"

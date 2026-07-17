@@ -8,8 +8,11 @@ Telegram group and hope someone scrolls past it" workflow with a searchable, fil
 
 - **Courts** — a seller posts a court slot (venue, date, time, price); a buyer browses,
   filters, opens a listing, reveals the seller's phone or Telegram, and contacts them directly.
-- **Players** — a host posts a game that needs players (venue, date, skill level, cost per
-  player); players find it the same way.
+- **Players** — a host posts a game that needs players (venue, date, skill level, players
+  needed, and the court's total max pax); players find it the same way.
+- Board filters — date, region, and skill level are all multi-select, so "this Saturday or
+  Sunday, Central or West" is one filter pass instead of several. Picking a date range on the
+  calendar highlights every day in between, like a flight-booking date picker.
 - A poster shares a phone number, a Telegram handle, or both — whichever they're comfortable
   giving out. Every listing also links out to the venue on Google Maps.
 
@@ -55,7 +58,8 @@ number to call". No sign-up friction, no login, used courtside on a phone.
    account needed — posting instantly gives you a private "manage link" that's the only way to
    edit or close that post later.
 2. **Browse** — anyone can filter the board by date, region, venue, time, and (for games)
-   skill level, without seeing anyone's phone number.
+   skill level — date, region, and skill support picking more than one at once — without
+   seeing anyone's phone number.
 3. **Reveal** — tapping "Reveal contact" on a listing shows whatever the poster gave: a phone
    number with one-tap `tel:` and WhatsApp links, a Telegram handle with a `t.me` link, or both.
 4. **Connect off-platform** — the rest (payment, meeting up, confirming) happens over the
