@@ -20,7 +20,7 @@ function listingItem(venueId: string, over: Record<string, unknown> = {}) {
 function sessionItem(venueId: string, over: Record<string, unknown> = {}) {
   return {
     venueId, date: todaySgt(), startTime: "18:00", endTime: "20:00",
-    playersNeeded: 2, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
+    playersNeeded: 2, maxPax: 6, skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
     notes: undefined, ...over,
   };
 }
@@ -158,7 +158,7 @@ describe("manageService", () => {
     const s = await createSessionBatch([sessionItem(venue.id)] as never, { phone: "+6581234567" });
     const [{ post }] = await findPostsByBatchToken(s.batchToken);
     const ok = await editSession(s.batchToken, post.id, {
-      date: todaySgt(), startTime: "19:00", endTime: "21:00", playersNeeded: 4,
+      date: todaySgt(), startTime: "19:00", endTime: "21:00", playersNeeded: 4, maxPax: 6,
       skillMin: "ADVANCED", skillMax: "ADVANCED", pricePerPlayerCents: 1000, notes: "updated",
       phone: "+6581234567",
     });

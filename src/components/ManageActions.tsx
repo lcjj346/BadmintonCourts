@@ -44,6 +44,7 @@ export function ManageActions({
   const [phone, setPhone] = useState(post.phone ?? "");
   const [telegramHandle, setTelegramHandle] = useState(post.telegramHandle ?? "");
   const [playersNeeded, setPlayersNeeded] = useState(post.playersNeeded ?? 2);
+  const [maxPax, setMaxPax] = useState(post.maxPax ?? Math.max(post.playersNeeded ?? 2, 6));
   const [skillMin, setSkillMin] = useState<SkillLevel>((post.skillMin as SkillLevel) ?? "MID_INTERMEDIATE");
   const [skillMax, setSkillMax] = useState<SkillLevel>((post.skillMax as SkillLevel) ?? "MID_INTERMEDIATE");
 
@@ -98,6 +99,10 @@ export function ManageActions({
       setToast("Enter a phone number or a Telegram handle");
       return;
     }
+    if (type === "session" && maxPax < playersNeeded) {
+      setToast("Max pax must be at least the number of players needed");
+      return;
+    }
     const cents = free ? 0 : price === "" ? null : Math.round(parseFloat(price) * 100);
     const endTime = addHoursToTime(startTime, duration);
     const contact = {
@@ -108,7 +113,7 @@ export function ManageActions({
       type === "listing"
         ? { action: "edit", date, startTime, endTime, priceCents: cents, notes: notes || undefined, ...contact }
         : {
-            action: "edit", date, startTime, endTime, playersNeeded, skillMin, skillMax,
+            action: "edit", date, startTime, endTime, playersNeeded, maxPax, skillMin, skillMax,
             pricePerPlayerCents: cents, notes: notes || undefined, ...contact,
           };
     if (await act(body)) {
@@ -179,9 +184,24 @@ export function ManageActions({
               className={input}
               aria-label="Edit players needed"
               value={playersNeeded}
-              onChange={(e) => setPlayersNeeded(Number(e.target.value))}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                setPlayersNeeded(next);
+                if (maxPax < next) setMaxPax(next);
+              }}
             >
               {PLAYER_COUNT_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <label className={label}>Max pax (total court capacity)</label>
+            <select
+              className={input}
+              aria-label="Edit max pax"
+              value={maxPax}
+              onChange={(e) => setMaxPax(Number(e.target.value))}
+            >
+              {PLAYER_COUNT_OPTIONS.filter((n) => n >= playersNeeded).map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>

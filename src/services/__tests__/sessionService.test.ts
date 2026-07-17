@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/db";
 import { resetDb, makeVenue } from "@/lib/__tests__/helpers/db";
 import { todaySgt } from "@/lib/time";
+import type { BoardFilters } from "@/lib/schemas";
 import { createSessionBatch, listSessions, revealSessionContact } from "@/services/sessionService";
 
 beforeEach(resetDb);
@@ -13,9 +14,13 @@ const tomorrow = dayjs(todaySgt()).add(1, "day").format("YYYY-MM-DD");
 
 const input = (venueId: string, over: Record<string, unknown> = {}) => ({
   venueId, date: tomorrow, startTime: "18:00", endTime: "20:00",
-  playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
+  playersNeeded: 2, maxPax: 6, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: 400,
   phone: "+6591234567", ...over,
 });
+
+// date/region/skill are multi-select arrays in BoardFilters; this fills the empty
+// defaults so test bodies only need to specify what they're actually testing.
+const bf = (over: Partial<BoardFilters> = {}): BoardFilters => ({ date: [], region: [], skill: [], ...over });
 
 // Single-item wrapper around the batch-create service, mirroring the old single-post API
 // so most test bodies stay unchanged.
@@ -32,7 +37,7 @@ describe("sessionService", () => {
   it("creates; board payload includes session fields, no phone/batchToken", async () => {
     const venue = await makeVenue();
     await createSession(input(venue.id));
-    const rows = await listSessions({});
+    const rows = await listSessions(bf());
     expect(rows).toHaveLength(1);
     expect(rows[0].playersNeeded).toBe(2);
     expect(rows[0].skillMin).toBe("MID_INTERMEDIATE");
@@ -57,24 +62,43 @@ describe("sessionService", () => {
     const venue = await makeVenue();
     await createSession(input(venue.id));
     await createSession(input(venue.id, { skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", phone: "+6581234567" }));
-    expect(await listSessions({ skill: "LOW_BEGINNER" })).toHaveLength(1);
+    expect(await listSessions(bf({ skill: ["LOW_BEGINNER"] }))).toHaveLength(1);
   });
 
   it("filters by skill within a range", async () => {
     const venue = await makeVenue();
     await createSession(input(venue.id, { skillMin: "MID_BEGINNER", skillMax: "LOW_INTERMEDIATE" }));
     await createSession(input(venue.id, { skillMin: "ADVANCED", skillMax: "ADVANCED", phone: "+6581234567" }));
-    const rows = await listSessions({ skill: "HIGH_BEGINNER" });
+    const rows = await listSessions(bf({ skill: ["HIGH_BEGINNER"] }));
     expect(rows).toHaveLength(1);
     expect(rows[0].skillMin).toBe("MID_BEGINNER");
+  });
+
+  it("multi-select skill matches a row whose range overlaps ANY selected skill", async () => {
+    const venue = await makeVenue();
+    await createSession(input(venue.id, { skillMin: "MID_BEGINNER", skillMax: "LOW_INTERMEDIATE" }));
+    await createSession(input(venue.id, { skillMin: "ADVANCED", skillMax: "ADVANCED", phone: "+6581234567" }));
+    await createSession(input(venue.id, { skillMin: "LOW_BEGINNER", skillMax: "LOW_BEGINNER", phone: "+6571234567" }));
+
+    const rows = await listSessions(bf({ skill: ["HIGH_BEGINNER", "ADVANCED"] }));
+    expect(rows).toHaveLength(2);
+    expect(rows.some((r) => r.skillMin === "LOW_BEGINNER")).toBe(false);
+  });
+
+  it("stores and returns maxPax alongside playersNeeded", async () => {
+    const venue = await makeVenue();
+    await createSession(input(venue.id, { playersNeeded: 3, maxPax: 8 }));
+    const rows = await listSessions(bf());
+    expect(rows[0].playersNeeded).toBe(3);
+    expect(rows[0].maxPax).toBe(8);
   });
 
   it("filters by time range", async () => {
     const venue = await makeVenue();
     await createSession(input(venue.id, { startTime: "08:00", endTime: "10:00" }));
     await createSession(input(venue.id, { startTime: "18:00", endTime: "20:00", phone: "+6581234567" }));
-    expect(await listSessions({ timeFrom: "08:00", timeTo: "10:00" })).toHaveLength(1);
-    expect(await listSessions({ timeFrom: "18:00" })).toHaveLength(1);
+    expect(await listSessions(bf({ timeFrom: "08:00", timeTo: "10:00" }))).toHaveLength(1);
+    expect(await listSessions(bf({ timeFrom: "18:00" }))).toHaveLength(1);
   });
 
   it("reveals phone", async () => {
@@ -92,7 +116,7 @@ describe("sessionService", () => {
     await createSession(input(venue.id, { startTime: "18:00", endTime: "20:00", phone: "+6581234567" }));
     await prisma.gameSession.update({ where: { id: filled.id }, data: { status: "FILLED" } });
 
-    const rows = await listSessions({ date: tomorrow });
+    const rows = await listSessions(bf({ date: [tomorrow] }));
     expect(rows).toHaveLength(2);
     expect(rows[0].status).toBe("OPEN");
     expect(rows[1].status).toBe("FILLED");
@@ -104,7 +128,7 @@ describe("sessionService", () => {
     await createSession(input(venue.id, { date: dayAfter, startTime: "09:00" }));
     await createSession(input(venue.id, { startTime: "20:00", phone: "+6581234567" }));
 
-    const rows = await listSessions({});
+    const rows = await listSessions(bf());
     expect(rows).toHaveLength(2);
     expect(rows[0].startTime).toBe("20:00"); // today before tomorrow
     expect(rows[1].startTime).toBe("09:00");
@@ -116,7 +140,7 @@ describe("sessionService", () => {
     await createSession(input(venue.id, { phone: "+6581234567" }));
     await prisma.gameSession.update({ where: { id: filled.id }, data: { status: "FILLED" } });
 
-    const rows = await listSessions({ available: "1" });
+    const rows = await listSessions(bf({ available: "1" }));
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe("OPEN");
   });

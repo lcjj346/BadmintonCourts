@@ -13,6 +13,7 @@ export type ManagedPost = {
     priceCents?: number | null;
     pricePerPlayerCents?: number | null;
     playersNeeded?: number;
+    maxPax?: number | null;
     skillMin?: string;
     skillMax?: string;
   };
@@ -26,7 +27,7 @@ const LISTING_MANAGE_SELECT = {
 
 const SESSION_MANAGE_SELECT = {
   id: true, date: true, startTime: true, endTime: true, status: true, notes: true, pricePerPlayerCents: true,
-  playersNeeded: true, skillMin: true, skillMax: true,
+  playersNeeded: true, maxPax: true, skillMin: true, skillMax: true,
   customVenueName: true, phone: true, telegramHandle: true,
   venue: { select: { name: true } },
 } as const;
@@ -57,7 +58,7 @@ export async function findPostsByBatchToken(token: string): Promise<ManagedPost[
       status: s.status, venueName: s.venue?.name ?? s.customVenueName ?? "Unlisted venue", notes: s.notes,
       phone: s.phone, telegramHandle: s.telegramHandle,
       pricePerPlayerCents: s.pricePerPlayerCents,
-      playersNeeded: s.playersNeeded, skillMin: s.skillMin, skillMax: s.skillMax,
+      playersNeeded: s.playersNeeded, maxPax: s.maxPax, skillMin: s.skillMin, skillMax: s.skillMax,
     },
   }));
 
@@ -141,7 +142,7 @@ export async function editSession(token: string, id: string, fields: EditSession
     data: {
       date: strToDate(fields.date), startTime: fields.startTime, endTime: fields.endTime,
       pricePerPlayerCents: fields.pricePerPlayerCents, notes: fields.notes,
-      playersNeeded: fields.playersNeeded, skillMin: fields.skillMin, skillMax: fields.skillMax,
+      playersNeeded: fields.playersNeeded, maxPax: fields.maxPax, skillMin: fields.skillMin, skillMax: fields.skillMax,
       phone: fields.phone ?? null, telegramHandle: fields.telegramHandle ?? null,
     },
   });

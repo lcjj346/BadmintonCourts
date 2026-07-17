@@ -163,7 +163,7 @@ describe("createListingSchema", () => {
 
 describe("createSessionSchema", () => {
   const sessionItem = (over: object = {}) => ({
-    ...item, playersNeeded: 2, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE",
+    ...item, playersNeeded: 2, maxPax: 6, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE",
     pricePerPlayerCents: 400, ...over,
   });
 
@@ -178,7 +178,12 @@ describe("createSessionSchema", () => {
   });
 
   it("accepts playersNeeded up to 50", () => {
-    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 50 })])).success).toBe(true);
+    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 50, maxPax: 50 })])).success).toBe(true);
+  });
+
+  it("rejects maxPax below playersNeeded, accepts equal", () => {
+    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 4, maxPax: 3 })])).success).toBe(false);
+    expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 4, maxPax: 4 })])).success).toBe(true);
   });
 
   it("accepts all seven skill levels", () => {
@@ -242,15 +247,23 @@ describe("editListingSchema", () => {
 describe("editSessionSchema", () => {
   it("accepts valid edit fields including skill range", () => {
     const r = editSessionSchema.safeParse({
-      ...item, playersNeeded: 3, skillMin: "LOW_BEGINNER", skillMax: "MID_BEGINNER", pricePerPlayerCents: null,
+      ...item, playersNeeded: 3, maxPax: 6, skillMin: "LOW_BEGINNER", skillMax: "MID_BEGINNER", pricePerPlayerCents: null,
       phone: "+6591234567",
     });
     expect(r.success).toBe(true);
   });
 
+  it("rejects maxPax below playersNeeded", () => {
+    const r = editSessionSchema.safeParse({
+      ...item, playersNeeded: 4, maxPax: 3, skillMin: "LOW_BEGINNER", skillMax: "MID_BEGINNER", pricePerPlayerCents: null,
+      phone: "+6591234567",
+    });
+    expect(r.success).toBe(false);
+  });
+
   it("rejects a reversed skill range", () => {
     const r = editSessionSchema.safeParse({
-      ...item, playersNeeded: 3, skillMin: "ADVANCED", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
+      ...item, playersNeeded: 3, maxPax: 6, skillMin: "ADVANCED", skillMax: "LOW_BEGINNER", pricePerPlayerCents: null,
     });
     expect(r.success).toBe(false);
   });
@@ -258,16 +271,45 @@ describe("editSessionSchema", () => {
 
 describe("boardFilterSchema", () => {
   it("parses empty filters", () => {
-    expect(boardFilterSchema.parse({})).toEqual({});
+    expect(boardFilterSchema.parse({})).toEqual({ date: [], region: [], skill: [] });
   });
 
   it("drops invalid values rather than crashing the board, keeping valid siblings", () => {
     const r = boardFilterSchema.safeParse({ region: "MOON", timeFrom: "08:00" });
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.data.region).toBeUndefined();
+      expect(r.data.region).toEqual([]);
       expect(r.data.timeFrom).toBe("08:00");
     }
+  });
+
+  it("accepts repeated date/region/skill params as multi-select arrays", () => {
+    const r = boardFilterSchema.safeParse({
+      date: ["2026-07-20", "2026-07-21"],
+      region: ["CENTRAL", "WEST"],
+      skill: ["LOW_BEGINNER", "ADVANCED"],
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.date).toEqual(["2026-07-20", "2026-07-21"]);
+      expect(r.data.region).toEqual(["CENTRAL", "WEST"]);
+      expect(r.data.skill).toEqual(["LOW_BEGINNER", "ADVANCED"]);
+    }
+  });
+
+  it("normalizes a single repeated-param value to a one-element array", () => {
+    const r = boardFilterSchema.safeParse({ date: "2026-07-20", region: "CENTRAL" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.date).toEqual(["2026-07-20"]);
+      expect(r.data.region).toEqual(["CENTRAL"]);
+    }
+  });
+
+  it("dedupes and drops invalid entries within a multi-select array", () => {
+    const r = boardFilterSchema.safeParse({ region: ["CENTRAL", "MOON", "CENTRAL", "WEST"] });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.region.sort()).toEqual(["CENTRAL", "WEST"]);
   });
 
   it("accepts timeFrom/timeTo range and drops malformed times", () => {

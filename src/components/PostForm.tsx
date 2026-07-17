@@ -30,6 +30,7 @@ type Entry = {
   free: boolean;
   notes: string;
   playersNeeded: number;
+  maxPax: number;
   skillMin: SkillLevel;
   skillMax: SkillLevel;
 };
@@ -48,6 +49,7 @@ function makeEntry(key: string): Entry {
     free: false,
     notes: "",
     playersNeeded: 2,
+    maxPax: 6,
     skillMin: "MID_BEGINNER",
     skillMax: "HIGH_BEGINNER",
   };
@@ -136,6 +138,9 @@ export function PostForm({
       if (isToday && nowTime && entry.startTime <= nowTime) {
         return setError("One of your slots' start times has already passed — pick a later time or another day");
       }
+      if (kind === "game" && entry.maxPax < entry.playersNeeded) {
+        return setError("Max pax must be at least the number of players needed");
+      }
     }
     if (!batchToken && !phone.trim() && !telegramHandle.trim()) {
       return setError("Enter a phone number or a Telegram handle");
@@ -155,7 +160,7 @@ export function PostForm({
           }
         : {
             ...venueFields, date: entry.date, startTime: entry.startTime, endTime,
-            playersNeeded: entry.playersNeeded, skillMin: entry.skillMin, skillMax: entry.skillMax,
+            playersNeeded: entry.playersNeeded, maxPax: entry.maxPax, skillMin: entry.skillMin, skillMax: entry.skillMax,
             pricePerPlayerCents: cents, notes: entry.notes || undefined,
           };
     });
@@ -343,12 +348,31 @@ export function PostForm({
                 <select
                   className={input}
                   value={entry.playersNeeded}
-                  onChange={(e) => updateEntry(entry.key, { playersNeeded: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const playersNeeded = Number(e.target.value);
+                    const patch: Partial<Entry> = { playersNeeded };
+                    if (entry.maxPax < playersNeeded) patch.maxPax = playersNeeded;
+                    updateEntry(entry.key, patch);
+                  }}
                 >
                   {PLAYER_COUNT_OPTIONS.map((n) => (
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
+                <label className={label} htmlFor={`post-maxpax-${entry.key}`}>Max pax (total court capacity)</label>
+                <select
+                  id={`post-maxpax-${entry.key}`}
+                  className={input}
+                  value={entry.maxPax}
+                  onChange={(e) => updateEntry(entry.key, { maxPax: Number(e.target.value) })}
+                >
+                  {PLAYER_COUNT_OPTIONS.filter((n) => n >= entry.playersNeeded).map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                  How many people can rotate on this court in total, not just how many more you need.
+                </p>
                 <label className={label}>Skill level</label>
                 <div className="flex gap-3">
                   <div className="flex-1">

@@ -50,7 +50,7 @@ export function ManagePostList({
               <p className="mt-1 text-sm font-medium text-court">
                 {type === "listing"
                   ? formatPrice(post.priceCents ?? null)
-                  : `Needs ${post.playersNeeded} · ${skillRangeLabel(post.skillMin as SkillLevel, post.skillMax as SkillLevel)} · ${formatPrice(post.pricePerPlayerCents ?? null)}/pax`}
+                  : `Needs ${post.playersNeeded}${post.maxPax ? ` (max ${post.maxPax})` : ""} · ${skillRangeLabel(post.skillMin as SkillLevel, post.skillMax as SkillLevel)} · ${formatPrice(post.pricePerPlayerCents ?? null)}/pax`}
               </p>
               <ManageActions token={token} post={managed} onDeleted={() => handleDeleted(post.id)} />
             </div>

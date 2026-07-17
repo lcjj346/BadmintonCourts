@@ -68,11 +68,13 @@ export async function listListings(filters: BoardFilters): Promise<PublicListing
   await sweepExpired();
   return prisma.listing.findMany({
     where: {
-      date: filters.date ? strToDate(filters.date) : { gte: strToDate(todaySgt()) },
+      date: filters.date.length > 0
+        ? { in: filters.date.map(strToDate) }
+        : { gte: strToDate(todaySgt()) },
       status: filters.available ? "AVAILABLE" : { in: ["AVAILABLE", "SOLD"] },
       ...(filters.venueId ? { venueId: filters.venueId } : {}),
-      ...(filters.region
-        ? { OR: [{ venue: { region: filters.region } }, { customRegion: filters.region }] }
+      ...(filters.region.length > 0
+        ? { OR: [{ venue: { region: { in: filters.region } } }, { customRegion: { in: filters.region } }] }
         : {}),
       ...(filters.timeFrom || filters.timeTo
         ? {
