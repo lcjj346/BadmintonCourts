@@ -19,6 +19,31 @@ const PUBLIC_LISTING_SELECT = {
 
 export type PublicListing = Prisma.ListingGetPayload<{ select: typeof PUBLIC_LISTING_SELECT }>;
 
+/**
+ * date/region/venue/time filtering is identical between listings and sessions (only the
+ * status enum differs, which each caller adds itself) — shared here so the two services
+ * don't drift out of sync on how a multi-select filter value gets turned into a `where`.
+ */
+export function buildBoardWhere(filters: BoardFilters) {
+  return {
+    date: filters.date.length > 0
+      ? { in: filters.date.map(strToDate) }
+      : { gte: strToDate(todaySgt()) },
+    ...(filters.venueId ? { venueId: filters.venueId } : {}),
+    ...(filters.region.length > 0
+      ? { OR: [{ venue: { region: { in: filters.region } } }, { customRegion: { in: filters.region } }] }
+      : {}),
+    ...(filters.timeFrom || filters.timeTo
+      ? {
+          startTime: {
+            ...(filters.timeFrom ? { gte: filters.timeFrom } : {}),
+            ...(filters.timeTo ? { lt: filters.timeTo } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
@@ -68,22 +93,8 @@ export async function listListings(filters: BoardFilters): Promise<PublicListing
   await sweepExpired();
   return prisma.listing.findMany({
     where: {
-      date: filters.date.length > 0
-        ? { in: filters.date.map(strToDate) }
-        : { gte: strToDate(todaySgt()) },
+      ...buildBoardWhere(filters),
       status: filters.available ? "AVAILABLE" : { in: ["AVAILABLE", "SOLD"] },
-      ...(filters.venueId ? { venueId: filters.venueId } : {}),
-      ...(filters.region.length > 0
-        ? { OR: [{ venue: { region: { in: filters.region } } }, { customRegion: { in: filters.region } }] }
-        : {}),
-      ...(filters.timeFrom || filters.timeTo
-        ? {
-            startTime: {
-              ...(filters.timeFrom ? { gte: filters.timeFrom } : {}),
-              ...(filters.timeTo ? { lt: filters.timeTo } : {}),
-            },
-          }
-        : {}),
     },
     select: PUBLIC_LISTING_SELECT,
     // Postgres enums sort by declared order (AVAILABLE, SOLD); asc puts AVAILABLE first
