@@ -64,12 +64,31 @@ export function PostForm({
   batchToken?: string;
 }) {
   const router = useRouter();
+  // Client-only SGT clock (null during SSR/first paint to avoid hydration mismatch).
+  // Declared before entries: newEntry() below reads it.
+  const [nowTime, setNowTime] = useState<string | null>(null);
+  useEffect(() => {
+    const tick = () => setNowTime(nowSgtTime());
+    tick();
+    const t = setInterval(tick, 30_000); // keep options fresh as time passes
+    return () => clearInterval(t);
+  }, []);
+
   // A plain incrementing counter (not crypto.randomUUID) so the first entry's key is
   // identical between the server render and the client hydration render — each gets
   // its own fresh ref starting at 0, unlike a random UUID which would mismatch.
   const nextKey = useRef(0);
   function newEntry(): Entry {
-    return makeEntry(`entry-${nextKey.current++}`);
+    const entry = makeEntry(`entry-${nextKey.current++}`);
+    // Born valid: a fresh entry defaults to today + "08:00", usually already past by
+    // the time someone posts — start it at the next slot instead. nowTime is null
+    // only during SSR/first paint, where the static default keeps hydration stable
+    // (the [nowTime] effect corrects that first entry right after mount).
+    if (entry.date === todaySgt() && nowTime && entry.startTime <= nowTime) {
+      const bumped = TIME_OPTIONS.find((t) => t > nowTime);
+      if (bumped) entry.startTime = bumped;
+    }
+    return entry;
   }
   const [entries, setEntries] = useState<Entry[]>(() => [newEntry()]);
   const [venueSheetFor, setVenueSheetFor] = useState<string | null>(null);
@@ -79,23 +98,22 @@ export function PostForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Client-only SGT clock (null during SSR/first paint to avoid hydration mismatch).
-  const [nowTime, setNowTime] = useState<string | null>(null);
-  useEffect(() => {
-    const tick = () => setNowTime(nowSgtTime());
-    tick();
-    const t = setInterval(tick, 30_000); // keep options fresh as time passes
-    return () => clearInterval(t);
-  }, []);
-
-  // A "today" entry's startTime can fall out of its own dropdown's option list —
-  // as nowTime advances past it (or a fresh entry defaults to a now-past time like
-  // "08:00") — leaving the <select>'s controlled value pointing at an <option> that
-  // no longer exists. Browsers then silently fall back to showing the first
-  // remaining option WITHOUT firing onChange, so the field visually shows a valid
-  // future time while the actual state (and therefore what gets submitted) is
-  // still the stale, already-past one. Keep state and the option list in sync so
-  // that never happens.
+  // A "today" entry's startTime can fall out of its own dropdown's option list as
+  // nowTime advances past it — leaving the <select>'s controlled value pointing at
+  // an <option> that no longer exists. Browsers then silently fall back to showing
+  // the first remaining option WITHOUT firing onChange, so the field visually shows
+  // a valid future time while the actual state (and therefore what gets submitted)
+  // is still the stale, already-past one. This keeps state in sync with the clock.
+  //
+  // Deps are [nowTime] ONLY — never entries. Depending on entries here caused a
+  // real intermittent infinite loop ("Maximum update depth exceeded") that froze
+  // posting: under concurrent rendering, the functional updater can be evaluated
+  // against a base state older than the render this effect observed (e.g. a date
+  // change to tomorrow still in flight), so it returns a fresh array ("bumping" the
+  // stale base) even though the rendered entry needed no bump — new reference →
+  // entries dep fires → effect re-runs → forever. The entries dep was only there
+  // for freshly added / date-edited entries; those are normalized at the point of
+  // change instead (validStartTime in newEntry and the DateField onChange).
   useEffect(() => {
     if (nowTime === null) return;
     setEntries((prev) => {
@@ -109,7 +127,13 @@ export function PostForm({
       });
       return changed ? next : prev;
     });
-  }, [nowTime, entries]);
+  }, [nowTime]);
+
+  /** First option still in the future, for a "today" entry whose startTime has passed — or null if fine as-is. */
+  function bumpedStartTime(date: string, startTime: string): string | null {
+    if (date !== todaySgt() || nowTime === null || startTime > nowTime) return null;
+    return TIME_OPTIONS.find((t) => t > nowTime) ?? null;
+  }
 
   function updateEntry(key: string, patch: Partial<Entry>) {
     setEntries((prev) => prev.map((e) => (e.key === key ? { ...e, ...patch } : e)));
@@ -312,7 +336,12 @@ export function PostForm({
               value={entry.date}
               min={todaySgt()}
               max={maxPostDateSgt()}
-              onChange={(d) => updateEntry(entry.key, { date: d })}
+              onChange={(d) => {
+                // Switching the date back to today can strand a startTime picked for
+                // another day in the past — normalize it in the same state change.
+                const bumped = bumpedStartTime(d, entry.startTime);
+                updateEntry(entry.key, bumped ? { date: d, startTime: bumped } : { date: d });
+              }}
             />
 
             <div className="flex gap-3">
