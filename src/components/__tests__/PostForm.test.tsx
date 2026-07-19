@@ -47,4 +47,28 @@ describe("PostForm", () => {
     expect(body.items[0].startTime).not.toBe("08:00");
     expect(body.items[0].startTime > "22:07").toBe(true);
   });
+
+  it("sends the honeypot field's real DOM value, so a bot autofilling the form is caught", async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    const { container } = render(<PostForm kind="court" venues={[]} />);
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    await user.click(screen.getByRole("button", { name: /enter it and post now/i }));
+    await user.type(screen.getByPlaceholderText("Venue name"), "Test Hall");
+    await user.selectOptions(screen.getByLabelText("Venue region"), "EAST");
+    await user.type(screen.getByPlaceholderText("9123 4567"), "91234567");
+
+    // Bots autofill via the DOM, invisibly to React — the input is uncontrolled,
+    // so setting .value directly is exactly what the submit handler must pick up.
+    const honeypot = container.querySelector('input[name="website"]') as HTMLInputElement;
+    honeypot.value = "https://spam.example";
+
+    await user.click(screen.getByRole("button", { name: /post court/i }));
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(JSON.parse(init.body as string).website).toBe("https://spam.example");
+  });
 });
