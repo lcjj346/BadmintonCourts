@@ -6,7 +6,7 @@ import { todaySgt, strToDate } from "@/lib/time";
 import type { BoardFilters } from "@/lib/schemas";
 import {
   createListingBatch, listListings, getListing, revealListingContact,
-  sweepExpired, ActivePostCapError,
+  sweepExpired, ActivePostCapError, BOARD_ROW_LIMIT,
 } from "@/services/listingService";
 
 beforeEach(resetDb);
@@ -159,6 +159,35 @@ describe("listingService", () => {
     const { id } = await createListing(input(venue.id, { date: todaySgt(), startTime: "00:00", endTime: "01:00" }));
     await sweepExpired();
     expect((await prisma.listing.findUniqueOrThrow({ where: { id } })).status).toBe("EXPIRED");
+  });
+
+  it("board reads sweep at most once a minute: first read sweeps, an immediate second read doesn't", async () => {
+    const venue = await makeVenue();
+    const backdate = strToDate(dayjs(todaySgt()).subtract(1, "day").format("YYYY-MM-DD"));
+
+    // resetDb (beforeEach) opened the gate, so this first read sweeps.
+    const { id: first } = await createListing(input(venue.id));
+    await prisma.listing.update({ where: { id: first }, data: { date: backdate } });
+    await listListings(bf());
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: first } })).status).toBe("EXPIRED");
+
+    // Gate is now closed — a second read within the interval must NOT sweep.
+    const { id: second } = await createListing(input(venue.id, { phone: "+6581234567" }));
+    await prisma.listing.update({ where: { id: second }, data: { date: backdate } });
+    await listListings(bf());
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: second } })).status).toBe("AVAILABLE");
+  });
+
+  it(`board returns at most ${BOARD_ROW_LIMIT} rows however many exist`, async () => {
+    const venue = await makeVenue();
+    const date = strToDate(tomorrow);
+    await prisma.listing.createMany({
+      data: Array.from({ length: BOARD_ROW_LIMIT + 20 }, (_, i) => ({
+        venueId: venue.id, date, startTime: "08:00", endTime: "10:00",
+        priceCents: 1000, phone: `+659${String(1000000 + i)}`,
+      })),
+    });
+    expect(await listListings(bf())).toHaveLength(BOARD_ROW_LIMIT);
   });
 
   it("sweep auto-expires a SOLD listing 1 hour after it was closed, but not sooner", async () => {

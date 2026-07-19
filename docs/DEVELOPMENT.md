@@ -184,7 +184,9 @@ sequenceDiagram
    that URL is the *only* way to manage any post in the batch (no login), so the click forces
    the poster to save it before they can do anything else.
 3. **Browse** — a buyer opens `/` (server component). `listingService.listListings` runs an
-   on-read sweep (expire past posts, scrub old phones/handles), then returns rows via
+   on-read sweep (expire past posts, scrub old phones/handles) — time-gated to at most once
+   per instance per minute, so busy traffic doesn't fire the sweep's write statements on
+   every view — then returns rows (capped at 500 as a DoS guard) via
    `PUBLIC_LISTING_SELECT` — a select that **structurally omits `phone`/`telegramHandle` and
    `batchToken`**, so contact info never reaches the browser. The venue's address (curated
    venues only) is included so the detail page can link out to Google Maps — no coordinates are
