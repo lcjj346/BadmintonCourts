@@ -6,6 +6,7 @@ import { createListingBatch } from "@/services/listingService";
 import { createSessionBatch } from "@/services/sessionService";
 import {
   findPostsByBatchToken, closePost, reopenPost, deletePost, updatePlayersNeeded, editListing, editSession,
+  MaxPaxExceededError,
 } from "@/services/manageService";
 
 beforeEach(resetDb);
@@ -121,6 +122,15 @@ describe("manageService", () => {
     const [{ post }] = await findPostsByBatchToken(l.batchToken);
     expect(await updatePlayersNeeded(l.batchToken, post.id, 5)).toBe(false);
     expect(await updatePlayersNeeded("00000000-0000-0000-0000-000000000000", post.id, 5)).toBe(false);
+  });
+
+  it("updatePlayersNeeded rejects a value above the post's own maxPax, accepts equal", async () => {
+    const venue = await makeVenue();
+    const s = await createSessionBatch([sessionItem(venue.id, { maxPax: 6 })] as never, { phone: "+6581234567" });
+    const [{ post }] = await findPostsByBatchToken(s.batchToken);
+    await expect(updatePlayersNeeded(s.batchToken, post.id, 7)).rejects.toThrow(MaxPaxExceededError);
+    expect(await updatePlayersNeeded(s.batchToken, post.id, 6)).toBe(true);
+    expect((await prisma.gameSession.findFirstOrThrow()).playersNeeded).toBe(6);
   });
 
   it("editListing updates date/time/price/notes", async () => {

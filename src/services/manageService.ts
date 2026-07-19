@@ -2,6 +2,13 @@ import { prisma } from "@/lib/db";
 import { dateToStr, strToDate } from "@/lib/time";
 import type { EditListingInput, EditSessionInput } from "@/lib/schemas";
 
+export class MaxPaxExceededError extends Error {
+  constructor() {
+    super("Players needed can't exceed this post's max pax");
+    this.name = "MaxPaxExceededError";
+  }
+}
+
 export type ManagedPost = {
   type: "listing" | "session";
   post: {
@@ -77,8 +84,18 @@ async function ownedSession(token: string, id: string) {
   return prisma.gameSession.findFirst({ where: { id, batchToken: token }, select: { id: true } });
 }
 
+/**
+ * The quick pax stepper on the manage page (ManageActions.tsx) clamps client-side to the
+ * post's own maxPax, but that's only a UI convenience — this throws MaxPaxExceededError so
+ * a direct API call can't violate the maxPax >= playersNeeded invariant that create/edit
+ * enforce everywhere else.
+ */
 export async function updatePlayersNeeded(token: string, id: string, playersNeeded: number): Promise<boolean> {
-  if (!(await ownedSession(token, id))) return false;
+  const session = await prisma.gameSession.findFirst({
+    where: { id, batchToken: token }, select: { maxPax: true },
+  });
+  if (!session) return false;
+  if (session.maxPax !== null && playersNeeded > session.maxPax) throw new MaxPaxExceededError();
   await prisma.gameSession.update({ where: { id }, data: { playersNeeded } });
   return true;
 }

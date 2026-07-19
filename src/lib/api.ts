@@ -2,6 +2,7 @@ import { ZodError } from "zod";
 import * as Sentry from "@sentry/nextjs";
 import { RateLimitError } from "@/services/rateLimitService";
 import { ActivePostCapError } from "@/services/listingService";
+import { MaxPaxExceededError } from "@/services/manageService";
 import { logger } from "@/lib/logger";
 
 export function ok(data: unknown, status = 200): Response {
@@ -34,6 +35,7 @@ export function handleError(e: unknown): Response {
   }
   if (e instanceof RateLimitError) return fail(e.message, 429);
   if (e instanceof ActivePostCapError) return fail(e.message, 409);
+  if (e instanceof MaxPaxExceededError) return fail(e.message, 400);
   // Only genuinely unexpected errors reach here (known cases mapped above) —
   // report them: Vercel Hobby keeps runtime logs ~1 hour, so pino alone means
   // a 3am failure is invisible by morning.

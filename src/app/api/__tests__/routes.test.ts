@@ -16,6 +16,7 @@ import { POST as createSessionRoute, GET as listSessionsRoute } from "@/app/api/
 import { POST as sessionRevealRoute } from "@/app/api/sessions/[id]/reveal/route";
 import { GET as venuesRoute } from "@/app/api/venues/route";
 import { POST as suggestRoute } from "@/app/api/venue-suggestions/route";
+import { GET as cronSweepRoute } from "@/app/api/cron/sweep/route";
 
 beforeEach(resetDb);
 afterAll(() => prisma.$disconnect());
@@ -126,6 +127,26 @@ describe("listings API", () => {
     );
     expect(close.status).toBe(200);
     expect((await prisma.gameSession.findFirstOrThrow()).status).toBe("FILLED");
+  });
+
+  it("PATCH updatePlayers above the post's own maxPax → 400, doesn't change the row", async () => {
+    const venue = await makeVenue();
+    const createRes = await createSessionRoute(req("http://x/api/sessions", "POST", {
+      items: [{
+        venueId: venue.id, date: tomorrow, startTime: "18:00", endTime: "20:00",
+        playersNeeded: 2, maxPax: 6, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: null,
+      }],
+      phone: "+6591234567", website: "",
+    }));
+    const { data } = await createRes.json();
+    const id = data.ids[0];
+
+    const res = await managePatch(
+      req(`http://x/api/manage/${data.batchToken}/${id}`, "PATCH", { type: "session", action: "updatePlayers", playersNeeded: 7 }),
+      params({ token: data.batchToken, id }),
+    );
+    expect(res.status).toBe(400);
+    expect((await prisma.gameSession.findFirstOrThrow()).playersNeeded).toBe(2);
   });
 
   it("PATCH updatePlayers on a listing → 400", async () => {
@@ -282,6 +303,37 @@ describe("venues API", () => {
     }));
     expect(res.status).toBe(201);
     expect(await prisma.venueSuggestion.count()).toBe(1);
+  });
+});
+
+describe("cron sweep API", () => {
+  afterEach(() => {
+    delete process.env.CRON_SECRET;
+  });
+
+  it("requires the bearer secret when CRON_SECRET is set, and sweeps when it matches", async () => {
+    process.env.CRON_SECRET = "test-cron-secret";
+    const venue = await makeVenue();
+    const created = await createListingRoute(req("http://x/api/listings", "POST", {
+      items: [{ venueId: venue.id, date: tomorrow, startTime: "08:00", endTime: "10:00", priceCents: 0 }],
+      phone: "+6591234567", website: "",
+    }));
+    const { data } = await created.json();
+    // Backdate past the start so the sweep should expire it.
+    await prisma.listing.update({
+      where: { id: data.ids[0] },
+      data: { date: new Date(Date.now() - 3 * 86_400_000) },
+    });
+
+    const unauthorized = await cronSweepRoute(new Request("http://x/api/cron/sweep"));
+    expect(unauthorized.status).toBe(401);
+    expect((await prisma.listing.findFirstOrThrow()).status).toBe("AVAILABLE");
+
+    const authorized = await cronSweepRoute(
+      new Request("http://x/api/cron/sweep", { headers: { authorization: "Bearer test-cron-secret" } }),
+    );
+    expect(authorized.status).toBe(200);
+    expect((await prisma.listing.findFirstOrThrow()).status).toBe("EXPIRED");
   });
 });
 

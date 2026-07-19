@@ -8,7 +8,10 @@ import {
 type Ctx = { params: Promise<{ token: string; id: string }> };
 
 const typeSchema = z.enum(["listing", "session"]);
-const playersNeededSchema = z.object({ playersNeeded: z.number().int().min(1).max(50) });
+// 30, not 50 — matches the playersNeeded/maxPax cap in createSessionSchema/editSessionSchema
+// (src/lib/schemas.ts). updatePlayersNeeded itself separately enforces playersNeeded <=
+// this specific post's own maxPax, which can be lower still.
+const playersNeededSchema = z.object({ playersNeeded: z.number().int().min(1).max(30) });
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
