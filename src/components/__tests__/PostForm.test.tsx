@@ -48,6 +48,41 @@ describe("PostForm", () => {
     expect(body.items[0].startTime > "22:07").toBe(true);
   });
 
+  it("an entry added via '+ Add another court' starts at the next valid slot, not the stale 08:00 default", async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    render(<PostForm kind="court" venues={[]} />);
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    await user.click(screen.getByRole("button", { name: /add another court/i }));
+
+    // 22:07 SGT — a second entry born with the static "08:00" default would silently
+    // submit a past time; it must be created already bumped to the next slot.
+    const starts = screen.getAllByLabelText("Start time") as HTMLSelectElement[];
+    expect(starts).toHaveLength(2);
+    expect(starts[1].value).toBe("22:30");
+  });
+
+  it("switching an entry's date back to today bumps a startTime that has already passed", async () => {
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    render(<PostForm kind="court" venues={[]} />);
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    // Move to tomorrow, where an early slot is legitimate, and pick one.
+    await user.click(screen.getByLabelText("Date"));
+    await user.click(screen.getByRole("button", { name: "17 July 2026" }));
+    await user.selectOptions(screen.getByLabelText("Start time"), "08:00");
+
+    // Back to today (22:07 SGT): 08:00 is now in the past and must be normalized in
+    // the same change, not left stranded until the next 30s clock tick.
+    await user.click(screen.getByLabelText("Date"));
+    await user.click(screen.getByRole("button", { name: "16 July 2026" }));
+    expect((screen.getByLabelText("Start time") as HTMLSelectElement).value).toBe("22:30");
+  });
+
   it("sends the honeypot field's real DOM value, so a bot autofilling the form is caught", async () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     const { container } = render(<PostForm kind="court" venues={[]} />);
