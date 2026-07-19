@@ -97,23 +97,8 @@ describe("listings API", () => {
     expect(data.map((l: { date: string }) => l.date.slice(0, 10)).sort()).toEqual([tomorrow, dayAfter].sort());
   });
 
-  it("posts a batch of courts under one manage link", async () => {
-    const venue = await makeVenue();
-    const body = {
-      items: [
-        { venueId: venue.id, date: tomorrow, startTime: "08:00", endTime: "10:00", priceCents: 1600 },
-        { venueId: venue.id, date: tomorrow, startTime: "18:00", endTime: "20:00", priceCents: 2000 },
-      ],
-      phone: "+6591234567", website: "",
-    };
-    const createRes = await createListingRoute(req("http://x/api/listings", "POST", body));
-    expect(createRes.status).toBe(201);
-    const { data } = await createRes.json();
-    expect(data.ids).toHaveLength(2);
-
-    const mg = await manageGet(req(`http://x/api/manage/${data.batchToken}`, "GET"), params({ token: data.batchToken }));
-    expect((await mg.json()).data).toHaveLength(2);
-  });
+  // Multi-item batches under one manage link are covered at the service layer
+  // (listingService.test.ts) and end-to-end (core-loop.spec.ts's two-courts test).
 
   it("PATCH updatePlayers updates a session; PATCH close still works", async () => {
     const venue = await makeVenue();

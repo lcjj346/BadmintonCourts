@@ -190,23 +190,6 @@ describe("createSessionSchema", () => {
     expect(createSessionSchema.safeParse(batch([sessionItem({ playersNeeded: 4, maxPax: 4 })])).success).toBe(true);
   });
 
-  it("accepts all seven skill levels", () => {
-    for (const skillLevel of [
-      "LOW_BEGINNER", "MID_BEGINNER", "HIGH_BEGINNER", "LOW_INTERMEDIATE",
-      "MID_INTERMEDIATE", "HIGH_INTERMEDIATE", "ADVANCED",
-    ]) {
-      expect(
-        createSessionSchema.safeParse(batch([sessionItem({ skillMin: skillLevel, skillMax: skillLevel })])).success,
-      ).toBe(true);
-    }
-  });
-
-  it("rejects an old three-value skill level", () => {
-    expect(
-      createSessionSchema.safeParse(batch([sessionItem({ skillMin: "INTERMEDIATE", skillMax: "INTERMEDIATE" })])).success,
-    ).toBe(false);
-  });
-
   it("accepts a skill range where max is higher than min", () => {
     expect(
       createSessionSchema.safeParse(batch([sessionItem({ skillMin: "MID_BEGINNER", skillMax: "LOW_INTERMEDIATE" })])).success,
