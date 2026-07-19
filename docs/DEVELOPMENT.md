@@ -366,13 +366,36 @@ compute after a few minutes of inactivity and wakes itself on the next query —
    If you want previews to serve real data, give the Preview scope its own separate
    database (e.g. a free Neon branch) instead.
 5. **Deploy** (`npx vercel --prod` or push to the connected branch). Vercel runs the
-   `vercel-build` script (preferred over `build` when present): `prisma generate`, then
-   `prisma migrate deploy` **only when `VERCEL_ENV=production`** — a preview build can
-   never migrate, whatever database its env happens to point at — then `next build`.
-   The deployed Prisma Client always matches `schema.prisma` and the schema is migrated
-   before the new code that expects it goes live — don't drop the `prisma generate` step
-   even if it looks redundant with `npm ci`'s own postinstall, since a cached
-   `node_modules` on Vercel can otherwise ship a stale client after a schema change.
+   `vercel-build` script (preferred over `build` when present — see
+   `scripts/vercel-build.sh`): `prisma generate`, then `prisma migrate deploy` **only
+   when `VERCEL_ENV=production`** (or on previews that explicitly opt in, below), then
+   `next build`. The deployed Prisma Client always matches `schema.prisma` and the
+   schema is migrated before the new code that expects it goes live — don't drop the
+   `prisma generate` step even if it looks redundant with `npm ci`'s own postinstall,
+   since a cached `node_modules` on Vercel can otherwise ship a stale client after a
+   schema change.
+
+### Working preview deployments (optional)
+
+By default previews build fine but serve no data (no env vars — pages that need the
+database show the global error screen). To make preview links fully usable, give the
+Preview environment its own isolated database:
+
+1. In Neon: create a branch of the project (e.g. named `preview`) — it gets its own
+   pooled + direct connection strings, copy-on-write, and can be reset anytime.
+2. In Vercel → Environment Variables, add these scoped to **Preview only**:
+   `DATABASE_URL` (preview branch pooled), `DIRECT_URL` (preview branch direct),
+   `IP_HASH_SALT` (any random string — NOT the production one), and
+   `PREVIEW_DATABASE=1`.
+3. That's it — with `PREVIEW_DATABASE=1` present, preview builds migrate the preview
+   branch to match the PR's schema and reseed venues (idempotent upsert) on every build.
+
+The `PREVIEW_DATABASE=1` flag is deliberate defence in depth: a production
+`DATABASE_URL` accidentally scoped into Preview is not enough to make preview builds
+run migrations — that exact mis-scoping is how preview builds once migrated production.
+Note all open PRs share the one preview branch, so two simultaneously open PRs with
+conflicting schema changes can fight over it — rarely an issue solo, and a branch reset
+in Neon fixes it.
 6. **Smoke test** on the production URL: post a listing, reveal it from another browser, mark
    it sold, delete it. Confirm `/api/listings` responses contain no `phone` field.
 7. **Region latency**: if the app feels slow, check that your Vercel project's function region
