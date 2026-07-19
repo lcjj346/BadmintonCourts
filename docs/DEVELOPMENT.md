@@ -16,6 +16,7 @@ the tech stack, architecture, local development, deployment, and testing.
 | Validation | **Zod** | One schema layer for API input **and** environment variables |
 | Dates/time | **dayjs** (utc + timezone) | Confined to `src/lib/time.ts`; all court times are SGT wall-clock |
 | Logging | **Pino** | JSON logs to stdout with `phone`/`batchToken`/`url` redaction |
+| Errors | **Sentry** (`@sentry/nextjs`, errors-only) | Client crashes + unexpected 500s; Vercel Hobby keeps runtime logs ~1h, so pino alone can't alert on production failures. Inert until `NEXT_PUBLIC_SENTRY_DSN` is set (free sentry.io project → copy DSN → Vercel env var, Production scope) |
 | Tests | **Jest + React Testing Library + Playwright** | Unit + component + one end-to-end core-loop |
 | Analytics | **Vercel Analytics** | Free, privacy-light traffic measurement |
 | Hosting | **Vercel + Neon** | Both free tiers cover ~1,000 users/day at $0/mo; Neon auto-wakes on query, no manual resume |
