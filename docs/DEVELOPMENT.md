@@ -315,8 +315,9 @@ vars from its dashboard directly, bypassing `.env*` files entirely.
 
 ```bash
 npm run dev              # dev server
-npm run build             # prisma generate + prisma migrate deploy + production build (the deploy gate)
-npm test                 # Jest unit + component tests (runs serially against the dev DB)
+npm run build             # prisma generate + production build (pure — never touches a database)
+                          # (Vercel deploys run `vercel-build` instead, which adds `prisma migrate deploy`)
+npm test                 # Jest unit + component tests (serial, against the dedicated test database)
 npm run test:e2e         # Playwright core-loop happy path
 npm run test:load        # opt-in: seeds ~300 courts+games and asserts perf ceilings (see Testing)
 npx tsc --noEmit         # type-check (Jest uses SWC and does NOT type-check)
@@ -357,10 +358,11 @@ compute after a few minutes of inactivity and wakes itself on the next query —
 4. **Create a Vercel project** from this repo. Set env vars in the Vercel dashboard:
    `DATABASE_URL` (pooled), `DIRECT_URL` (direct), `IP_HASH_SALT` (`openssl rand -hex 32`,
    don't reuse your local dev value).
-5. **Deploy** (`npx vercel --prod` or push to the connected branch). The build script runs
-   `prisma generate && prisma migrate deploy && next build`, so the deployed Prisma Client
-   always matches `schema.prisma` and the database schema is always migrated before the new
-   code that expects it goes live — don't drop the `prisma generate` step even if it looks
+5. **Deploy** (`npx vercel --prod` or push to the connected branch). Vercel runs the
+   `vercel-build` script (preferred over `build` when present): `prisma generate &&
+   prisma migrate deploy && next build`, so the deployed Prisma Client always matches
+   `schema.prisma` and the database schema is always migrated before the new code that
+   expects it goes live — don't drop the `prisma generate` step even if it looks
    redundant with `npm ci`'s own postinstall, since a cached `node_modules` on Vercel can
    otherwise ship a stale client after a schema change.
 6. **Smoke test** on the production URL: post a listing, reveal it from another browser, mark
@@ -374,10 +376,13 @@ compute after a few minutes of inactivity and wakes itself on the next query —
 
 ### Migrations deploy automatically, atomically with every Vercel build
 
-`npm run build` (the exact command Vercel runs, via `package.json`'s `build` script) now runs
-`prisma migrate deploy` immediately before `next build`. This is the primary mechanism: every
-Vercel deploy migrates the database as an inseparable part of that same build, so there's no
-window where new code can run against an old schema.
+`package.json`'s `vercel-build` script (which Vercel runs in preference to `build` when it
+exists) runs `prisma migrate deploy` immediately before `next build`. This is the primary
+mechanism: every Vercel deploy migrates the database as an inseparable part of that same
+build, so there's no window where new code can run against an old schema. The plain `build`
+script deliberately does NOT migrate — a local `npm run build` is pure and can never touch a
+database as a side effect (on a machine with `.env.production.local`, the old combined script
+was one env mixup away from migrating production from a laptop).
 
 `.github/workflows/ci.yml` also has a `migrate-production` job that runs `prisma migrate
 deploy` (then reseeds venues) against production, after a **push to `main`** — never on a

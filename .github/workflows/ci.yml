@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# A force-push or quick follow-up commit cancels the superseded PR run instead of
+# burning minutes on a stale commit. Runs on main are never cancelled — the
+# migrate-production job must not be killed mid-deploy.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Both jobs need a throwaway Postgres. Service tests hit a real database, and
 # they wipe/seed rows, so each job gets its own isolated instance.
 env:
@@ -15,7 +22,7 @@ env:
 
 jobs:
   test:
-    name: Typecheck · unit tests · build
+    name: Lint · typecheck · unit tests
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -42,12 +49,16 @@ jobs:
         run: npx prisma migrate deploy
       - name: Seed venues
         run: npx prisma db seed
+      # Explicit lint step — today lint also runs implicitly inside `next build`,
+      # but Next is moving away from that; this keeps lint enforced regardless.
+      - name: Lint
+        run: npm run lint
       - name: Typecheck
         run: npx tsc --noEmit
       - name: Unit + integration tests
         run: npm test
-      - name: Production build
-        run: npm run build
+      # No build here — the e2e job production-builds this same commit anyway,
+      # and typecheck already catches what a second build would.
 
   e2e:
     name: Playwright E2E (core loop)
@@ -77,8 +88,24 @@ jobs:
         run: npx prisma migrate deploy
       - name: Seed venues
         run: npx prisma db seed
+      # Chromium is ~150MB per run — cache it keyed on the Playwright version, since
+      # each Playwright release pins its own browser build.
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+      # Cache hit skips the download, but the runner's OS-level deps still need installing.
+      - name: Install Playwright OS deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - name: Production build
         run: npm run build
       - name: Run E2E
@@ -105,11 +132,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
-      # `npm run build`'s own build script now runs `prisma migrate deploy` before
-      # `next build`, so Vercel's own build is the primary, atomic place migrations
-      # actually apply — no more race between this job and Vercel's independent
-      # deploy. This step is a defensive backup only (e.g. Vercel build skipped/
-      # disabled) — safe to run twice since migrate deploy is idempotent.
+      # The `vercel-build` script (which Vercel prefers over `build` when present)
+      # runs `prisma migrate deploy` before `next build`, so Vercel's own build is
+      # the primary, atomic place migrations actually apply — no race between this
+      # job and Vercel's independent deploy. A plain local `npm run build` stays
+      # pure (no DB writes). This step is a defensive backup only (e.g. Vercel
+      # build skipped/disabled) — safe to run twice since migrate deploy is
+      # idempotent.
       # Overrides the throwaway-Postgres DATABASE_URL/DIRECT_URL set at workflow level above —
       # this is the one job in this file that's meant to touch the real database.
       - name: Apply migrations to production
