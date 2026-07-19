@@ -264,10 +264,15 @@ No Docker? Point `DATABASE_URL`/`DIRECT_URL` in `.env` at any Postgres (e.g. a f
 
 ### Keeping local dev separate from production
 
-`.env` is what `npm run dev`, `npm test`, and plain `npx prisma …` commands read — **always
-keep this pointed at your local Docker Postgres**, never at production. Because
-`npm test`/Jest truncates tables between runs, pointing `.env` at a live database would wipe
-real data.
+`.env` is what `npm run dev` and plain `npx prisma …` commands read — **always keep this
+pointed at your local Docker Postgres**, never at production.
+
+`npm test`/Jest uses the committed `.env.test` instead (Jest runs with `NODE_ENV=test`, which
+makes Next's env loader prefer it): the same local Postgres container, but a dedicated `test`
+schema. Jest truncates every table between runs, so this isolation is what keeps `npm test`
+from wiping whatever data you have in the dev app. The schema is created and migrated
+automatically on first run (`jest.global-setup.ts`), and outside CI the setup refuses to run
+at all unless the URL points at the test schema.
 
 When you need to run a one-off command against production (e.g. after a schema migration,
 before merging a PR), keep those credentials in a separate, gitignored `.env.production.local`

@@ -10,7 +10,7 @@ const config: Config = {
     "<rootDir>/e2e/", "<rootDir>/e2e-load/", "<rootDir>/.next/", "<rootDir>/src/lib/__tests__/helpers/",
   ],
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
-  globalTeardown: "<rootDir>/jest.global-teardown.ts",
+  globalSetup: "<rootDir>/jest.global-setup.ts",
 };
 
 export default createJestConfig(config);
