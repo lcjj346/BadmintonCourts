@@ -357,14 +357,21 @@ compute after a few minutes of inactivity and wakes itself on the next query —
    touch anything.
 4. **Create a Vercel project** from this repo. Set env vars in the Vercel dashboard:
    `DATABASE_URL` (pooled), `DIRECT_URL` (direct), `IP_HASH_SALT` (`openssl rand -hex 32`,
-   don't reuse your local dev value).
+   don't reuse your local dev value), and `CRON_SECRET` (`openssl rand -hex 32`) so the
+   daily sweep endpoint only answers to Vercel's scheduler. **Scope all of these to the
+   Production environment only** — preview deployments of unmerged PRs must never see the
+   production database (this actually happened: prod's `_prisma_migrations` shows branch
+   migrations landing an hour before their PRs were merged, applied by preview builds).
+   If you want previews to serve real data, give the Preview scope its own separate
+   database (e.g. a free Neon branch) instead.
 5. **Deploy** (`npx vercel --prod` or push to the connected branch). Vercel runs the
-   `vercel-build` script (preferred over `build` when present): `prisma generate &&
-   prisma migrate deploy && next build`, so the deployed Prisma Client always matches
-   `schema.prisma` and the database schema is always migrated before the new code that
-   expects it goes live — don't drop the `prisma generate` step even if it looks
-   redundant with `npm ci`'s own postinstall, since a cached `node_modules` on Vercel can
-   otherwise ship a stale client after a schema change.
+   `vercel-build` script (preferred over `build` when present): `prisma generate`, then
+   `prisma migrate deploy` **only when `VERCEL_ENV=production`** — a preview build can
+   never migrate, whatever database its env happens to point at — then `next build`.
+   The deployed Prisma Client always matches `schema.prisma` and the schema is migrated
+   before the new code that expects it goes live — don't drop the `prisma generate` step
+   even if it looks redundant with `npm ci`'s own postinstall, since a cached
+   `node_modules` on Vercel can otherwise ship a stale client after a schema change.
 6. **Smoke test** on the production URL: post a listing, reveal it from another browser, mark
    it sold, delete it. Confirm `/api/listings` responses contain no `phone` field.
 7. **Region latency**: if the app feels slow, check that your Vercel project's function region
@@ -383,6 +390,10 @@ build, so there's no window where new code can run against an old schema. The pl
 script deliberately does NOT migrate — a local `npm run build` is pure and can never touch a
 database as a side effect (on a machine with `.env.production.local`, the old combined script
 was one env mixup away from migrating production from a laptop).
+
+A daily Vercel cron (`vercel.json` → `/api/cron/sweep`, 09:00 SGT) runs the same sweep the
+board triggers on read. Without it, the FAQ's "phone numbers deleted 14 days after expiry"
+promise only held if someone happened to visit — now it holds unconditionally, traffic or not.
 
 `.github/workflows/ci.yml` also has a `migrate-production` job that runs `prisma migrate
 deploy` (then reseeds venues) against production, after a **push to `main`** — never on a
