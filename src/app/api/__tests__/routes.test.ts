@@ -128,6 +128,26 @@ describe("listings API", () => {
     expect((await prisma.gameSession.findFirstOrThrow()).status).toBe("FILLED");
   });
 
+  it("PATCH updatePlayers above the post's own maxPax → 400, doesn't change the row", async () => {
+    const venue = await makeVenue();
+    const createRes = await createSessionRoute(req("http://x/api/sessions", "POST", {
+      items: [{
+        venueId: venue.id, date: tomorrow, startTime: "18:00", endTime: "20:00",
+        playersNeeded: 2, maxPax: 6, skillMin: "MID_INTERMEDIATE", skillMax: "MID_INTERMEDIATE", pricePerPlayerCents: null,
+      }],
+      phone: "+6591234567", website: "",
+    }));
+    const { data } = await createRes.json();
+    const id = data.ids[0];
+
+    const res = await managePatch(
+      req(`http://x/api/manage/${data.batchToken}/${id}`, "PATCH", { type: "session", action: "updatePlayers", playersNeeded: 7 }),
+      params({ token: data.batchToken, id }),
+    );
+    expect(res.status).toBe(400);
+    expect((await prisma.gameSession.findFirstOrThrow()).playersNeeded).toBe(2);
+  });
+
   it("PATCH updatePlayers on a listing → 400", async () => {
     const venue = await makeVenue();
     const createRes = await createListingRoute(req("http://x/api/listings", "POST", {
