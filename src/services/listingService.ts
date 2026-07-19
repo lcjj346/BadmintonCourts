@@ -47,6 +47,36 @@ export function buildBoardWhere(filters: BoardFilters) {
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
+/** Board queries return at most this many rows — a cheap guard so one unauthenticated
+ * request can never pull the entire table; the active-post cap keeps organic data
+ * far below it anyway. */
+export const BOARD_ROW_LIMIT = 500;
+
+const SWEEP_INTERVAL_MS = 60_000;
+let lastSweepAt = 0;
+
+/**
+ * Runs the sweep at most once per instance per SWEEP_INTERVAL_MS. Without this,
+ * every single board view fired sweepExpired()'s five write statements — pure
+ * write amplification, since expiry only needs minute-level freshness. The gate
+ * is deliberately in-memory (module state), not a DB row: a DB-side timestamp
+ * check would itself cost a write per view, defeating the point. On serverless
+ * each warm instance keeps its own clock, so worst case is one sweep per
+ * instance per minute — still a ~100x reduction under load, and a cold start
+ * sweeping immediately is exactly what a just-woken board wants anyway.
+ */
+export async function maybeSweepExpired(): Promise<void> {
+  const now = Date.now();
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS) return;
+  lastSweepAt = now;
+  await sweepExpired();
+}
+
+/** Tests only: reopen the gate so each test observes sweep behavior deterministically. */
+export function resetSweepGateForTests(): void {
+  lastSweepAt = 0;
+}
+
 /** On-read sweep: expire past/long-closed posts, scrub stale phones, prune rate-limit events. */
 export async function sweepExpired(): Promise<void> {
   const today = strToDate(todaySgt());
@@ -90,7 +120,7 @@ export async function sweepExpired(): Promise<void> {
 }
 
 export async function listListings(filters: BoardFilters): Promise<PublicListing[]> {
-  await sweepExpired();
+  await maybeSweepExpired();
   return prisma.listing.findMany({
     where: {
       ...buildBoardWhere(filters),
@@ -99,6 +129,7 @@ export async function listListings(filters: BoardFilters): Promise<PublicListing
     select: PUBLIC_LISTING_SELECT,
     // Postgres enums sort by declared order (AVAILABLE, SOLD); asc puts AVAILABLE first
     orderBy: [{ date: "asc" }, { status: "asc" }, { startTime: "asc" }],
+    take: BOARD_ROW_LIMIT,
   });
 }
 

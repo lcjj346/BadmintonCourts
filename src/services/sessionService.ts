@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { strToDate } from "@/lib/time";
 import type { BoardFilters, CreateSessionItemInput } from "@/lib/schemas";
-import { sweepExpired, buildBoardWhere } from "@/services/listingService";
+import { maybeSweepExpired, buildBoardWhere, BOARD_ROW_LIMIT } from "@/services/listingService";
 import { assertUnderActiveCap, newBatchToken, withContactLock, contactWhere, type Contact } from "@/services/batchService";
 import { SKILL_ORDER } from "@/lib/skill";
 
@@ -19,7 +19,7 @@ const PUBLIC_SESSION_SELECT = {
 export type PublicSession = Prisma.GameSessionGetPayload<{ select: typeof PUBLIC_SESSION_SELECT }>;
 
 export async function listSessions(filters: BoardFilters): Promise<PublicSession[]> {
-  await sweepExpired();
+  await maybeSweepExpired();
   const rows = await prisma.gameSession.findMany({
     where: {
       ...buildBoardWhere(filters),
@@ -28,6 +28,9 @@ export async function listSessions(filters: BoardFilters): Promise<PublicSession
     select: PUBLIC_SESSION_SELECT,
     // Postgres enums sort by declared order (OPEN, FILLED); asc puts OPEN first
     orderBy: [{ date: "asc" }, { status: "asc" }, { startTime: "asc" }],
+    // Cap applies before the JS skill filter below, so past ~500 rows a skill
+    // search could miss later matches — fine for a DoS guard, not pagination.
+    take: BOARD_ROW_LIMIT,
   });
 
   // A poster's skill is a RANGE, so "filter by skill X" means "X falls within [skillMin, skillMax]" —

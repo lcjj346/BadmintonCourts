@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
+import { resetSweepGateForTests } from "@/services/listingService";
 
 export async function resetDb() {
+  // Each test starts with the sweep gate open, so listListings/listSessions
+  // sweep deterministically instead of depending on what an earlier test did.
+  resetSweepGateForTests();
   // Order matters only for FK targets; venue-dependent tables first.
   await prisma.reportFlag.deleteMany();
   await prisma.rateLimitEvent.deleteMany();
