@@ -123,9 +123,14 @@ export function PostForm({
     setEntries((prev) => (prev.length <= 1 ? prev : prev.filter((e) => e.key !== key)));
   }
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    // Read the honeypot's REAL value from the DOM, synchronously, before any await.
+    // The input is uncontrolled (no React state) so a bot autofilling the form is
+    // invisible to React — a hardcoded "" here would defeat the whole trap, since
+    // the server only fires it when the field arrives non-empty.
+    const website = (new FormData(e.currentTarget).get("website") as string | null) ?? "";
 
     for (const entry of entries) {
       if (entry.customVenue) {
@@ -179,7 +184,7 @@ export function PostForm({
               items,
               phone: local ? `${countryCode}${local}` : undefined,
               telegramHandle: handle || undefined,
-              website: "",
+              website,
             };
           })();
       const res = await fetch(url, {
