@@ -42,6 +42,31 @@ async function deletePost(page: Page, nth = 0) {
   await page.getByRole("dialog", { name: "Delete post?" }).getByRole("button", { name: /^delete$/i }).click();
 }
 
+// The venue+date prologue shared by nearly every scenario: pick Choa Chu Kang from
+// the curated list, then tomorrow's date. `nth` targets a specific entry's Date
+// field when the form holds more than one court/game. Only entries still showing
+// "Choose a venue…" match the trigger, so on a multi-entry form this fills the
+// first not-yet-configured one.
+async function fillVenueAndDate(page: Page, nth = 0) {
+  await page.getByRole("button", { name: /choose a venue/i }).click();
+  const sheet = page.getByRole("dialog", { name: "Venue" });
+  await sheet.getByPlaceholder(/search venues/i).fill("choa chu");
+  await sheet.getByRole("button", { name: /choa chu kang/i }).click();
+  await pickDate(page.getByLabel("Date").nth(nth), tomorrowSgt());
+}
+
+// Posts a single $16 court at Choa Chu Kang for tomorrow and waits for the manage
+// redirect. Contact is the shared test PHONE unless a telegramHandle is given instead.
+async function postCourt(page: Page, opts: { telegramHandle?: string } = {}) {
+  await page.goto("/post/court");
+  await fillVenueAndDate(page);
+  await page.getByPlaceholder(/negotiable/i).fill("16");
+  if (opts.telegramHandle) await page.getByPlaceholder("@username").fill(opts.telegramHandle);
+  else await page.getByPlaceholder("9123 4567").fill(PHONE);
+  await page.getByRole("button", { name: /post court/i }).click();
+  await expectManageRedirect(page);
+}
+
 // Captured per-page in a beforeEach below — an uncaught exception thrown
 // synchronously inside submit() (e.g. while building the request body, before
 // its try/catch) would leave the button stuck on "Posting…" forever with no
@@ -107,18 +132,9 @@ test.afterAll(async () => {
 });
 
 test("court: post → browse → detail → reveal → mark sold", async ({ page }) => {
-  // Post a court listing.
-  await page.goto("/post/court");
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  await page.getByPlaceholder(/search venues/i).fill("choa chu");
-  await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date"), tomorrowSgt());
-  await page.getByPlaceholder(/negotiable/i).fill("16");
-  await page.getByPlaceholder("9123 4567").fill(PHONE);
-  await page.getByRole("button", { name: /post court/i }).click();
+  await postCourt(page);
 
   // Success = manage page, gated behind an explicit "copy my manage link" click.
-  await expectManageRedirect(page);
   await expect(page.getByText(/copy your manage link before continuing/i)).toBeVisible();
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
@@ -161,10 +177,7 @@ test("court: post → browse → detail → reveal → mark sold", async ({ page
 
 test("game: post → players tab → skill filter → detail", async ({ page }) => {
   await page.goto("/post/game");
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  await page.getByPlaceholder(/search venues/i).fill("choa chu");
-  await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date"), tomorrowSgt());
+  await fillVenueAndDate(page);
   await page.getByLabel("Skill level from").selectOption("ADVANCED");
   await page.getByPlaceholder("9123 4567").fill("81234567");
   await page.getByRole("button", { name: /post game/i }).click();
@@ -202,21 +215,14 @@ test("game: post → players tab → skill filter → detail", async ({ page }) 
 
 test("posts two courts in one batch under a single manage link", async ({ page }) => {
   await page.goto("/post/court");
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  await page.getByPlaceholder(/search venues/i).fill("choa chu");
-  await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date"), tomorrowSgt());
+  await fillVenueAndDate(page);
   await page.getByPlaceholder(/negotiable/i).fill("16");
 
   await page.getByRole("button", { name: /add another court/i }).click();
   await expect(page.getByText("Court 2")).toBeVisible();
-  // Court 1's venue button now reads "Choa Chu Kang Sport Hall", so only Court 2's
-  // button still matches "Choose a venue…".
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  const sheet = page.getByRole("dialog", { name: "Venue" });
-  await sheet.getByPlaceholder(/search venues/i).fill("choa chu");
-  await sheet.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date").nth(1), tomorrowSgt());
+  // Court 1's venue button now reads "Choa Chu Kang Sport Hall", so the helper's
+  // "Choose a venue…" trigger matches only Court 2's button.
+  await fillVenueAndDate(page, 1);
   await page.getByPlaceholder(/negotiable/i).nth(1).fill("20");
 
   await page.getByPlaceholder("9123 4567").fill(PHONE);
@@ -244,16 +250,7 @@ test("posts two courts in one batch under a single manage link", async ({ page }
 });
 
 test("can't reach 'add another' before saving the manage link, and adding one re-gates it", async ({ page }) => {
-  await page.goto("/post/court");
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  await page.getByPlaceholder(/search venues/i).fill("choa chu");
-  await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date"), tomorrowSgt());
-  await page.getByPlaceholder(/negotiable/i).fill("16");
-  await page.getByPlaceholder("9123 4567").fill(PHONE);
-  await page.getByRole("button", { name: /post court/i }).click();
-
-  await expectManageRedirect(page);
+  await postCourt(page);
   const manageUrl = page.url().split("?")[0];
 
   // Before copying the link, "+ Add another court" must not be reachable — otherwise a
@@ -264,10 +261,7 @@ test("can't reach 'add another' before saving the manage link, and adding one re
   await page.getByRole("button", { name: /copy my manage link/i }).click();
   await page.getByRole("link", { name: /add another court/i }).click();
 
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  await page.getByPlaceholder(/search venues/i).fill("choa chu");
-  await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date"), tomorrowSgt());
+  await fillVenueAndDate(page);
   await page.getByPlaceholder(/negotiable/i).fill("20");
   await page.getByRole("button", { name: /^add court$/i }).click();
 
@@ -317,16 +311,7 @@ test("posts at a venue not in the list, and it shows up filtered by region", asy
 test("posts with only a Telegram handle (no phone), reveals a Telegram link, and a Maps link works", async ({ page }) => {
   const handle = `test_user_${Date.now()}`;
 
-  await page.goto("/post/court");
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  await page.getByPlaceholder(/search venues/i).fill("choa chu");
-  await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date"), tomorrowSgt());
-  await page.getByPlaceholder(/negotiable/i).fill("16");
-  await page.getByPlaceholder("@username").fill(handle);
-  await page.getByRole("button", { name: /post court/i }).click();
-
-  await expectManageRedirect(page);
+  await postCourt(page, { telegramHandle: handle });
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
 
@@ -349,16 +334,7 @@ test("posts with only a Telegram handle (no phone), reveals a Telegram link, and
 test("editing a post can switch its contact from phone to Telegram", async ({ page }) => {
   const handle = `edited_user_${Date.now()}`;
 
-  await page.goto("/post/court");
-  await page.getByRole("button", { name: /choose a venue/i }).click();
-  await page.getByPlaceholder(/search venues/i).fill("choa chu");
-  await page.getByRole("button", { name: /choa chu kang/i }).click();
-  await pickDate(page.getByLabel("Date"), tomorrowSgt());
-  await page.getByPlaceholder(/negotiable/i).fill("16");
-  await page.getByPlaceholder("9123 4567").fill(PHONE);
-  await page.getByRole("button", { name: /post court/i }).click();
-
-  await expectManageRedirect(page);
+  await postCourt(page);
   const manageUrl = page.url().split("?")[0];
   await page.getByRole("button", { name: /copy my manage link/i }).click();
 

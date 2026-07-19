@@ -93,13 +93,8 @@ describe("sessionService", () => {
     expect(rows[0].maxPax).toBe(8);
   });
 
-  it("filters by time range", async () => {
-    const venue = await makeVenue();
-    await createSession(input(venue.id, { startTime: "08:00", endTime: "10:00" }));
-    await createSession(input(venue.id, { startTime: "18:00", endTime: "20:00", phone: "+6581234567" }));
-    expect(await listSessions(bf({ timeFrom: "08:00", timeTo: "10:00" }))).toHaveLength(1);
-    expect(await listSessions(bf({ timeFrom: "18:00" }))).toHaveLength(1);
-  });
+  // Date/region/venue/time filtering is shared with listings via buildBoardWhere and
+  // covered by listingService.test.ts — this suite only tests what's session-specific.
 
   it("reveals phone", async () => {
     const venue = await makeVenue();
@@ -131,18 +126,6 @@ describe("sessionService", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].status).toBe("OPEN");
     expect(rows[1].status).toBe("FILLED");
-  });
-
-  it("with no date filter, returns all upcoming dates ordered by date then status then startTime", async () => {
-    const venue = await makeVenue();
-    const dayAfter = dayjs(todaySgt()).add(2, "day").format("YYYY-MM-DD");
-    await createSession(input(venue.id, { date: dayAfter, startTime: "09:00" }));
-    await createSession(input(venue.id, { startTime: "20:00", phone: "+6581234567" }));
-
-    const rows = await listSessions(bf());
-    expect(rows).toHaveLength(2);
-    expect(rows[0].startTime).toBe("20:00"); // today before tomorrow
-    expect(rows[1].startTime).toBe("09:00");
   });
 
   it("with available=1, only OPEN sessions are returned", async () => {
