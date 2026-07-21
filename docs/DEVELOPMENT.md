@@ -103,7 +103,8 @@ src/
                                filled, revert, delete, add another court/game to the same link)
     venue-request/page.tsx   "Request a venue" form
     api/                     14 route handlers (listings, sessions, manage, venues, suggestions, presence)
-  components/                Cards, BottomSheet, DateStrip, FilterBar, VenuePicker, RevealButton, …
+  components/                Cards, BottomSheet, DateStrip, FilterBar, VenuePicker, RevealButton,
+                               OnboardingTour, …
   services/                  All Prisma queries live here
   lib/
     env.ts                   Zod-validated environment variables
@@ -207,6 +208,19 @@ sequenceDiagram
    "+ Add another court/game", which reopens the post form pre-wired to `POST
    /api/manage/[token]/items` — it appends to the same `batchToken` and reuses the batch's
    existing phone, so no phone re-entry and no new manage link.
+
+### First-visit onboarding tour
+
+`OnboardingTour` (rendered in `page.tsx`, next to the FAQ link) is a spotlight-style walkthrough
+of the board: Courts/Players tabs → date strip → filter bar → the "+" post button → the FAQ link
+(for anything the tour doesn't cover). It targets
+existing elements via `data-tour="..."` attributes (no changes to their internals), dims the rest
+of the viewport with a CSS `box-shadow` spotlight trick, and repositions on every step change,
+resize, and scroll — the same component and logic handle both mobile and desktop, no separate
+code paths. It auto-opens once per browser (`localStorage["badmintonsg_tour_seen"]`) and can be
+replayed anytime via the "?" button. Playwright's default `storageState` (see
+`playwright.config.ts`) marks it "already seen" so other e2e specs aren't blocked by the overlay;
+`e2e/onboarding-tour.spec.ts` explicitly resets that to test the real first-visit flow.
 
 ### Time handling
 
