@@ -9,6 +9,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { ListingCard } from "@/components/ListingCard";
 import { SessionCard } from "@/components/SessionCard";
 import { OnlineCount } from "@/components/OnlineCount";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 export const dynamic = "force-dynamic";
 
@@ -65,17 +66,22 @@ export default async function BoardPage({
           <Link href="/faq" className="text-sm font-medium text-court underline">
             FAQ
           </Link>
+          <OnboardingTour />
         </div>
       </header>
 
-      <nav className="mt-2 flex border-b border-gray-200">
+      <nav data-tour="tabs" className="mt-2 flex border-b border-gray-200">
         <Link href={`/?tab=courts${dateQ}`} className={tabClass(tab === "courts")}>Courts</Link>
         <Link href={`/?tab=players${dateQ}`} className={tabClass(tab === "players")}>Players</Link>
       </nav>
 
       <div className="sticky top-14 z-20 -mx-4 bg-paper/95 px-4 backdrop-blur-md">
-        <DateStrip />
-        <FilterBar venues={venues} showSkill={tab === "players"} />
+        <div data-tour="date-strip">
+          <DateStrip />
+        </div>
+        <div data-tour="filters">
+          <FilterBar venues={venues} showSkill={tab === "players"} />
+        </div>
       </div>
 
       {/* min-h keeps a short/empty board tall enough that the footer's disclaimer text
@@ -117,6 +123,7 @@ export default async function BoardPage({
       <Link
         href="/post"
         aria-label="Post"
+        data-tour="post-button"
         className="fixed bottom-6 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-court text-white shadow-lg transition-transform hover:scale-105 hover:shadow-xl active:scale-95"
       >
         <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

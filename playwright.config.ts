@@ -25,7 +25,17 @@ export default defineConfig({
   // failure" step had nothing to actually upload. "list" keeps normal terminal
   // output; "html" (never auto-opened) is what makes that upload step useful.
   reporter: [["list"], ["html", { open: "never" }]],
-  use: { baseURL: "http://localhost:3000" },
+  use: {
+    baseURL: "http://localhost:3000",
+    // Functional specs don't care about the first-visit onboarding tour and its
+    // full-screen overlay would just block their clicks — default every test to
+    // "already seen" it. onboarding-tour.spec.ts explicitly resets this to test
+    // the real first-visit experience.
+    storageState: {
+      cookies: [],
+      origins: [{ origin: "http://localhost:3000", localStorage: [{ name: "badmintonsg_tour_seen", value: "1" }] }],
+    },
+  },
   projects: [
     { name: "mobile-chrome", use: { ...devices["Pixel 7"], permissions: ["clipboard-write"] } },
   ],
