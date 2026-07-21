@@ -47,6 +47,13 @@ export default function FaqPage() {
           </ol>
         </Card>
 
+        <Card title="How do I see the tutorial again?">
+          <p>
+            On the board page, tap the <strong>&quot;?&quot;</strong> button next to this FAQ link
+            to replay the walkthrough of the Courts/Players tabs, date filter, and post button.
+          </p>
+        </Card>
+
         <Card title="How long does a post last?">
           <p>
             A post stays visible until its start time passes, then it expires automatically.
