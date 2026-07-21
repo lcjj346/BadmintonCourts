@@ -12,7 +12,7 @@ const STEPS: Step[] = [
   {
     target: "tabs",
     title: "Courts & Players",
-    body: "Courts shows balloted slots someone can't use — grab one free. Players shows people looking for others to join their game.",
+    body: "Courts shows balloted slots someone can't use. Players shows people looking for others to join their game.",
   },
   {
     target: "date-strip",
