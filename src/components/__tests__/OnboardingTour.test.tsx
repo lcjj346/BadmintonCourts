@@ -10,6 +10,7 @@ function renderWithTargets() {
     <div data-tour="date-strip"></div>
     <div data-tour="filters"></div>
     <a data-tour="post-button"></a>
+    <a data-tour="faq"></a>
     <div id="root"></div>
   `;
   return render(<OnboardingTour />, { container: document.getElementById("root")! });
@@ -20,7 +21,7 @@ beforeEach(() => {
 });
 
 describe("OnboardingTour", () => {
-  it("auto-opens on first visit and walks through all 4 steps", async () => {
+  it("auto-opens on first visit and walks through all 5 steps", async () => {
     const user = userEvent.setup();
     renderWithTargets();
 
@@ -31,6 +32,8 @@ describe("OnboardingTour", () => {
     expect(await screen.findByText("Narrow it down")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(await screen.findByText("Post in seconds")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Need more help?")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Got it" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

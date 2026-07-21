@@ -29,6 +29,11 @@ const STEPS: Step[] = [
     title: "Post in seconds",
     body: "Got a court to give up, or want to find players? Tap here to post.",
   },
+  {
+    target: "faq",
+    title: "Need more help?",
+    body: "The FAQ covers post lifetime, editing/managing a post, and the skill level guide.",
+  },
 ];
 
 type Rect = { top: number; left: number; width: number; height: number };

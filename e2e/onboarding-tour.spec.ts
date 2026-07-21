@@ -17,6 +17,8 @@ test.describe("onboarding tour", () => {
     await expect(page.getByRole("dialog", { name: "Narrow it down" })).toBeVisible();
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Post in seconds" })).toBeVisible();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Need more help?" })).toBeVisible();
     await page.getByRole("button", { name: "Got it" }).click();
 
     await expect(page.getByRole("dialog")).toHaveCount(0);

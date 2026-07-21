@@ -63,7 +63,7 @@ export default async function BoardPage({
         <h1 className="text-lg font-bold">BadmintonSG</h1>
         <div className="flex items-center gap-3">
           <OnlineCount />
-          <Link href="/faq" className="text-sm font-medium text-court underline">
+          <Link href="/faq" data-tour="faq" className="text-sm font-medium text-court underline">
             FAQ
           </Link>
           <OnboardingTour />

@@ -212,7 +212,8 @@ sequenceDiagram
 ### First-visit onboarding tour
 
 `OnboardingTour` (rendered in `page.tsx`, next to the FAQ link) is a spotlight-style walkthrough
-of the board: Courts/Players tabs → date strip → filter bar → the "+" post button. It targets
+of the board: Courts/Players tabs → date strip → filter bar → the "+" post button → the FAQ link
+(for anything the tour doesn't cover). It targets
 existing elements via `data-tour="..."` attributes (no changes to their internals), dims the rest
 of the viewport with a CSS `box-shadow` spotlight trick, and repositions on every step change,
 resize, and scroll — the same component and logic handle both mobile and desktop, no separate
