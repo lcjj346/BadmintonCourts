@@ -75,14 +75,22 @@ describe("DateStrip", () => {
 
     const start = dayjs(todaySgt()).add(2, "day");
     const end = dayjs(todaySgt()).add(4, "day");
-    await userEvent.click(screen.getByRole("button", { name: start.format("D MMMM YYYY") }));
 
-    // The grid shows one month at a time — page forward if the end date falls in a
-    // later month than the one currently on screen (e.g. a range spanning month-end).
-    const monthsToAdvance = end.startOf("month").diff(start.startOf("month"), "month");
-    for (let i = 0; i < monthsToAdvance; i++) {
-      await userEvent.click(screen.getByRole("button", { name: "Next month" }));
+    // The grid shows one month at a time and starts on today's month — page forward
+    // as needed before each click (the calendar opens on today's month, so even the
+    // first click may need to advance, e.g. when "+2 days" alone crosses month-end).
+    let viewMonth = dayjs(todaySgt()).startOf("month");
+    async function openMonthOf(date: dayjs.Dayjs) {
+      const months = date.startOf("month").diff(viewMonth, "month");
+      for (let i = 0; i < months; i++) {
+        await userEvent.click(screen.getByRole("button", { name: "Next month" }));
+      }
+      viewMonth = date.startOf("month");
     }
+
+    await openMonthOf(start);
+    await userEvent.click(screen.getByRole("button", { name: start.format("D MMMM YYYY") }));
+    await openMonthOf(end);
     await userEvent.click(screen.getByRole("button", { name: end.format("D MMMM YYYY") }));
 
     // Still hasn't navigated — the range is only highlighted, awaiting confirmation.
