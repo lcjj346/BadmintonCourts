@@ -104,7 +104,7 @@ src/
     venue-request/page.tsx   "Request a venue" form
     api/                     14 route handlers (listings, sessions, manage, venues, suggestions, presence)
   components/                Cards, BottomSheet, DateStrip, FilterBar, VenuePicker, RevealButton,
-                               OnboardingTour, …
+                               OnboardingTour, IntroSplash, …
   services/                  All Prisma queries live here
   lib/
     env.ts                   Zod-validated environment variables
@@ -208,6 +208,19 @@ sequenceDiagram
    "+ Add another court/game", which reopens the post form pre-wired to `POST
    /api/manage/[token]/items` — it appends to the same `batchToken` and reuses the batch's
    existing phone, so no phone re-entry and no new manage link.
+
+### First-visit intro splash
+
+`IntroSplash` (rendered in `page.tsx`, portalled to `document.body`) plays once per browser
+session before the onboarding tour or anything else: it builds a badminton court out of pure
+CSS/SVG — floor, real doubles/singles line markings, then the net rises with "BADMINTONSG"
+flipping in letter-by-letter across it — holds briefly, then the whole court wipes upward
+(`clip-path`) to reveal the real board underneath. ~2.35s total, gated by
+`sessionStorage["badmintonsg_intro_seen"]`, and skipped entirely (not just shortened) when
+`prefers-reduced-motion: reduce` is set, since the animation itself is the whole point — there's
+no reduced-motion "safe subset" of a splash screen. Its keyframes live in `globals.css` under the
+`.intro-*` classes; the component only owns the timing/gating logic. Sits at a higher z-index than
+`OnboardingTour` so it always covers the tour if both would show on the same brand-new visit.
 
 ### First-visit onboarding tour
 
