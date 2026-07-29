@@ -76,6 +76,13 @@ describe("DateStrip", () => {
     const start = dayjs(todaySgt()).add(2, "day");
     const end = dayjs(todaySgt()).add(4, "day");
     await userEvent.click(screen.getByRole("button", { name: start.format("D MMMM YYYY") }));
+
+    // The grid shows one month at a time — page forward if the end date falls in a
+    // later month than the one currently on screen (e.g. a range spanning month-end).
+    const monthsToAdvance = end.startOf("month").diff(start.startOf("month"), "month");
+    for (let i = 0; i < monthsToAdvance; i++) {
+      await userEvent.click(screen.getByRole("button", { name: "Next month" }));
+    }
     await userEvent.click(screen.getByRole("button", { name: end.format("D MMMM YYYY") }));
 
     // Still hasn't navigated — the range is only highlighted, awaiting confirmation.
