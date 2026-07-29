@@ -112,28 +112,48 @@ body {
 
 .intro-scene {
   position: relative;
-  /* Grows with the viewport on larger screens instead of staying pinned to a
-     phone-sized box — bounded by both width AND height (via the court's own
-     aspect ratio) so it scales up on a laptop/desktop without ever
-     overflowing a short viewport, then capped so it doesn't get absurd on
-     an ultrawide monitor. */
-  width: min(80vw, calc(70vh * 0.524), 460px);
-  aspect-ratio: 220 / 420;
   border-radius: 10px;
   overflow: hidden;
   background: #efeee8;
+  /* Lets .intro-flap size itself off this box's own rendered dimensions
+     (cqw/cqh/cqmin below) instead of the full viewport — the earlier vw-based
+     sizing overflowed whenever the scene itself stayed small on a tall,
+     narrow-viewport-relative window. */
+  container-type: size;
+}
+
+/* Portrait — phones and narrow windows. Grows with the viewport instead of
+   staying pinned to a fixed phone-sized box, bounded by both width AND
+   height (via the court's own aspect ratio) so it can't overflow a short
+   window, capped so it doesn't get silly on a very tall narrow screen. */
+.intro-scene-v {
+  display: block;
+  width: min(80vw, calc(70vh * 0.524), 460px);
+  aspect-ratio: 220 / 420;
+}
+
+/* Landscape — laptop/desktop. A portrait court can never fill a wide window
+   no matter how large it's scaled, so above the breakpoint we swap to the
+   court's own real proportions rotated: the net runs vertically (exactly
+   how it looks viewed down the length of a real court), sized off the
+   viewport's height so it actually reads as large on a wide screen. */
+.intro-scene-h {
+  display: none;
+  width: min(90vw, calc(78vh * 1.909), 780px);
+  aspect-ratio: 420 / 220;
+}
+@media (min-width: 860px) {
+  .intro-scene-v { display: none; }
+  .intro-scene-h { display: block; }
 }
 
 .intro-floor {
   position: absolute;
-  left: 4.55%;
-  right: 4.55%;
-  top: 2.38%;
-  bottom: 2.38%;
   border-radius: 5px;
   background: #1c6b44;
-  clip-path: inset(0 100% 0 0);
 }
+.intro-scene-v .intro-floor { left: 4.55%; right: 4.55%; top: 2.38%; bottom: 2.38%; clip-path: inset(0 100% 0 0); }
+.intro-scene-h .intro-floor { left: 2.38%; right: 2.38%; top: 4.55%; bottom: 4.55%; clip-path: inset(0 100% 0 0); }
 .intro-overlay.playing .intro-floor {
   animation: intro-floor-fill 460ms cubic-bezier(0.77, 0, 0.175, 1) forwards;
 }
@@ -171,52 +191,65 @@ body {
 
 .intro-net {
   position: absolute;
-  left: 4.55%;
-  right: 4.55%;
-  top: 50%;
-  height: clamp(5px, 1.2vw, 8px);
-  margin-top: calc(clamp(5px, 1.2vw, 8px) / -2);
   background: linear-gradient(#f2f7f3, #d8e0da);
   border-radius: 1px;
-  transform: scaleY(0);
   opacity: 0;
   transform-origin: center;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
-.intro-net::before,
-.intro-net::after {
-  content: "";
-  position: absolute;
-  top: clamp(-10px, -1.8vw, -6px);
-  bottom: clamp(-10px, -1.8vw, -6px);
-  width: clamp(3px, 0.8vw, 5px);
-  background: #17181a;
-  border-radius: 1px;
+.intro-net-v {
+  left: 4.55%; right: 4.55%; top: 50%;
+  height: clamp(5px, 1.2cqmin, 8px);
+  margin-top: calc(clamp(5px, 1.2cqmin, 8px) / -2);
+  transform: scaleY(0);
 }
-.intro-net::before { left: -1px; }
-.intro-net::after { right: -1px; }
-.intro-overlay.playing .intro-net {
-  animation: intro-net-rise 320ms cubic-bezier(0.23, 1, 0.32, 1) 900ms forwards;
+.intro-net-h {
+  top: 4.55%; bottom: 4.55%; left: 50%;
+  width: clamp(5px, 1.2cqmin, 8px);
+  margin-left: calc(clamp(5px, 1.2cqmin, 8px) / -2);
+  transform: scaleX(0);
 }
-@keyframes intro-net-rise {
-  to { transform: scaleY(1); opacity: 1; }
+.intro-net-v::before, .intro-net-v::after {
+  content: ""; position: absolute; top: clamp(-10px, -1.8cqmin, -6px); bottom: clamp(-10px, -1.8cqmin, -6px);
+  width: clamp(3px, 0.8cqmin, 5px); background: #17181a; border-radius: 1px;
 }
+.intro-net-v::before { left: -1px; }
+.intro-net-v::after { right: -1px; }
+.intro-net-h::before, .intro-net-h::after {
+  content: ""; position: absolute; left: clamp(-10px, -1.8cqmin, -6px); right: clamp(-10px, -1.8cqmin, -6px);
+  height: clamp(3px, 0.8cqmin, 5px); background: #17181a; border-radius: 1px;
+}
+.intro-net-h::before { top: -1px; }
+.intro-net-h::after { bottom: -1px; }
+.intro-overlay.playing .intro-net-v {
+  animation: intro-net-rise-v 320ms cubic-bezier(0.23, 1, 0.32, 1) 900ms forwards;
+}
+.intro-overlay.playing .intro-net-h {
+  animation: intro-net-rise-h 320ms cubic-bezier(0.23, 1, 0.32, 1) 900ms forwards;
+}
+@keyframes intro-net-rise-v { to { transform: scaleY(1); opacity: 1; } }
+@keyframes intro-net-rise-h { to { transform: scaleX(1); opacity: 1; } }
 
 .intro-netband {
   position: absolute;
-  left: 4.55%;
-  right: 4.55%;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
   z-index: 1;
 }
+.intro-netband-v {
+  left: 4.55%; right: 4.55%; top: 50%;
+  transform: translateY(-50%);
+  flex-direction: row;
+}
+.intro-netband-h {
+  top: 4.55%; bottom: 4.55%; left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+}
+
 .intro-flap {
-  width: clamp(16px, 4vw, 26px);
-  height: clamp(22px, 5.5vw, 36px);
   border-radius: 3px;
   background: #16201a;
   color: #eaf3e4;
@@ -224,11 +257,23 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: clamp(12px, 3vw, 19px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transform-style: preserve-3d;
   transform: rotateX(90deg);
   animation-fill-mode: forwards;
+}
+/* Sized off the container's own (constrained) dimension via cqmin — the row
+   in portrait is width-bound, the column in landscape is height-bound, so
+   the two variants deliberately swap which axis gets the tighter budget. */
+.intro-netband-v .intro-flap {
+  width: clamp(12px, 7cqmin, 22px);
+  height: clamp(17px, 9.5cqmin, 30px);
+  font-size: clamp(10px, 4.6cqmin, 15px);
+}
+.intro-netband-h .intro-flap {
+  width: clamp(17px, 9.5cqmin, 30px);
+  height: clamp(12px, 7cqmin, 22px);
+  font-size: clamp(10px, 4.6cqmin, 15px);
 }
 .intro-overlay.playing .intro-flap {
   animation-name: intro-flap-in;
@@ -247,7 +292,8 @@ body {
   .intro-overlay.playing .intro-lines .service,
   .intro-overlay.playing .intro-lines .dlong,
   .intro-overlay.playing .intro-lines .center,
-  .intro-overlay.playing .intro-net,
+  .intro-overlay.playing .intro-net-v,
+  .intro-overlay.playing .intro-net-h,
   .intro-overlay.playing .intro-flap {
     animation-duration: 1ms !important;
     animation-delay: 0ms !important;

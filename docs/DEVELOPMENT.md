@@ -215,7 +215,13 @@ sequenceDiagram
 session before the onboarding tour or anything else: it builds a badminton court out of pure
 CSS/SVG — floor, real doubles/singles line markings, then the net rises with "BADMINTONSG"
 flipping in letter-by-letter across it — holds briefly, then the whole court wipes upward
-(`clip-path`) to reveal the real board underneath. ~2.35s total, gated by
+(`clip-path`) to reveal the real board underneath. Renders **two** orientation variants at
+once — a portrait court (net horizontal, wordmark in a row) for narrow viewports, and a
+landscape court (net vertical, wordmark stacked in a column along it) for laptop/desktop —
+switched purely by a `min-width: 860px` media query, since a tall portrait shape can't fill
+a wide window no matter how large it's scaled. Both scenes size themselves off their own
+`container-type: size` box via `cqmin` units rather than the viewport, so the wordmark can
+never overflow regardless of how big or small the court ends up rendering. ~2.35s total, gated by
 `sessionStorage["badmintonsg_intro_seen"]`, and skipped entirely (not just shortened) when
 `prefers-reduced-motion: reduce` is set, since the animation itself is the whole point — there's
 no reduced-motion "safe subset" of a splash screen. Its keyframes live in `globals.css` under the
