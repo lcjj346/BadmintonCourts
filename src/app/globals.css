@@ -112,7 +112,12 @@ body {
 
 .intro-scene {
   position: relative;
-  width: min(78vw, 300px);
+  /* Grows with the viewport on larger screens instead of staying pinned to a
+     phone-sized box — bounded by both width AND height (via the court's own
+     aspect ratio) so it scales up on a laptop/desktop without ever
+     overflowing a short viewport, then capped so it doesn't get absurd on
+     an ultrawide monitor. */
+  width: min(80vw, calc(70vh * 0.524), 460px);
   aspect-ratio: 220 / 420;
   border-radius: 10px;
   overflow: hidden;
@@ -169,8 +174,8 @@ body {
   left: 4.55%;
   right: 4.55%;
   top: 50%;
-  height: 5px;
-  margin-top: -2.5px;
+  height: clamp(5px, 1.2vw, 8px);
+  margin-top: calc(clamp(5px, 1.2vw, 8px) / -2);
   background: linear-gradient(#f2f7f3, #d8e0da);
   border-radius: 1px;
   transform: scaleY(0);
@@ -182,9 +187,9 @@ body {
 .intro-net::after {
   content: "";
   position: absolute;
-  top: -6px;
-  bottom: -6px;
-  width: 3px;
+  top: clamp(-10px, -1.8vw, -6px);
+  bottom: clamp(-10px, -1.8vw, -6px);
+  width: clamp(3px, 0.8vw, 5px);
   background: #17181a;
   border-radius: 1px;
 }
@@ -210,8 +215,8 @@ body {
   z-index: 1;
 }
 .intro-flap {
-  width: 16px;
-  height: 22px;
+  width: clamp(16px, 4vw, 26px);
+  height: clamp(22px, 5.5vw, 36px);
   border-radius: 3px;
   background: #16201a;
   color: #eaf3e4;
@@ -219,7 +224,7 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 12px;
+  font-size: clamp(12px, 3vw, 19px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transform-style: preserve-3d;
   transform: rotateX(90deg);
