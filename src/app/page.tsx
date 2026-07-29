@@ -10,6 +10,7 @@ import { ListingCard } from "@/components/ListingCard";
 import { SessionCard } from "@/components/SessionCard";
 import { OnlineCount } from "@/components/OnlineCount";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { IntroSplash } from "@/components/IntroSplash";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export default async function BoardPage({
 
   return (
     <main>
+      <IntroSplash />
       <header className="flex items-center justify-between pt-4">
         <h1 className="text-lg font-bold">BadmintonSG</h1>
         <div className="flex items-center gap-3">
